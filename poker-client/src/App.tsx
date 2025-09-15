@@ -10,6 +10,23 @@ import React, { useMemo, useState } from "react";
 // --- Adjust this if your server runs elsewhere
 const API_BASE = "http://localhost:8787";
 
+// === derived flags ===
+const isDrawPhase = debug?.mode === "draw";
+const isBetPhase  = debug?.mode === "bet";
+
+const isYourTurn  = useMemo(() => {
+  // p1 の番なら currentSeat が "p1"
+  return debug?.currentSeat === "p1";
+}, [debug?.currentSeat]);
+
+const canCheck = Boolean(state) && isBetPhase && isYourTurn && (state?.toCall ?? 0) === 0;
+const canCall  = Boolean(state) && isBetPhase && isYourTurn && (state?.toCall ?? 0) > 0;
+const canBet   = Boolean(state) && isBetPhase && isYourTurn && (state?.toCall ?? 0) === 0; // 簡易
+const canRaise = Boolean(state) && isBetPhase && isYourTurn && (state?.toCall ?? 0) > 0 && (debug?.raises ?? 0) < (debug?.cap ?? 0);
+
+// Draw は「ドローフェーズ かつ 自分の番 かつ 3枚まで選択」
+const canDrawNow = Boolean(state) && isDrawPhase && isYourTurn && discards.length <= 3;
+
 // Types for common responses
 type Card =
   | "Ah" | "Ad" | "Ac" | "As" | "Kh" | "Kd" | "Kc" | "Ks" | "Qh" | "Qd" | "Qc" | "Qs"
@@ -50,7 +67,11 @@ export default function D27Demo() {
 
   const heroHand = state?.heroHand ?? [];
 
-  const canDraw = useMemo(() => discards.length <= 3, [discards.length]);
+// 変更後（drawフェーズかつ3枚まで）
+const canDraw = useMemo(
+  () => (debug?.mode === "draw") && discards.length <= 3,
+  [debug?.mode, discards.length]
+);
 
   function toggleDiscard(card: Card) {
     setDiscards((prev) => {
@@ -69,11 +90,13 @@ export default function D27Demo() {
     setLoading(true);
     setErr("");
     try {
-      const res = await fetch(`${API_BASE}${path}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: body ? JSON.stringify(body) : undefined,
-      });
+      const init: RequestInit = { method: "POST" };
+      if (body !== undefined) {
+        init.headers = { "Content-Type": "application/json" };
+        init.body = JSON.stringify(body);
+      }
+  
+      const res = await fetch(`${API_BASE}${path}`, init);
       const json = await res.json();
       if (!res.ok) throw new Error(json?.message || "HTTP error");
       return json as T;
@@ -84,6 +107,7 @@ export default function D27Demo() {
       setLoading(false);
     }
   }
+    
 
   async function onNewTable() {
     const r = await callApi<{ tableId: string }>("/d27/table/new");
@@ -172,7 +196,16 @@ export default function D27Demo() {
         <button className="btn" onClick={() => act("bet")} disabled={!state || loading}>Bet</button>
         <button className="btn" onClick={() => act("raise")} disabled={!state || loading}>Raise</button>
         <button className="btn !bg-red-600 hover:!bg-red-700" onClick={() => act("fold")} disabled={!state || loading}>Fold</button>
-        <button className="btn" onClick={onDraw} disabled={!state || loading || !canDraw}>Draw ({discards.length})</button>
+
+        <button
+          type="button"
+          className="btn"
+          onClick={onDraw}
+          disabled={!state || loading || !canDraw}
+          title={debug?.mode !== "draw" ? "You can only draw in the Draw phase" : undefined}
+        >
+          Draw ({discards.length})
+        </button>
         <button className="btn" onClick={onShowdown} disabled={!tableId || loading}>Showdown</button>
         <button className="btn" onClick={onNewHand} disabled={!tableId || loading}>New Hand</button>
         <button className="btn" onClick={refreshDebug} disabled={!tableId || loading}>Refresh Debug</button>
@@ -201,6 +234,12 @@ export default function D27Demo() {
           {/* Hero Hand with discard toggles */}
           <div className="mt-4">
             <div className="text-sm text-neutral-400 mb-2">Click cards to select up to 3 for discard</div>
+            <div className="text-xs mt-1">
+              Phase: <span className="font-mono">{debug?.mode ?? "?"}</span>
+              {debug?.mode !== "draw" && (
+                <span className="ml-2 text-yellow-400">（現在はドロー不可：まずベットを進めてください）</span>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
               {heroHand.map((c) => {
                 const on = discards.includes(c);
