@@ -91,60 +91,62 @@ import {
     /** 卓を作る */
     // TwoSevenGame.ts
 
-createTable({
-  seats = 6,
-  smallBet = 1,
-  bigBet = 2,
-  cap = 4,
-}: {
-  seats?: number;
-  smallBet?: number;
-  bigBet?: number;
-  cap?: number;
-}) {
-  const id = randomId("td7_");
-  const seatObjs = Array.from({ length: seats }, (_, i) => ({
-    id: `p${i + 1}`,
-    stack: 100,
-    inHand: true,
-    drawsRemaining: 3,
-  }));
-
-  const t: DrawTableState = {
-    id,
-    seats: seatObjs as any,
-    deck: [],
-    discards: [],
-    current: 0,
-    config: { smallBet, bigBet, cap },
-    round: undefined as any,
-    mode: "bet",          // ★ これを追加（必須）
-  };
-
-  tables.set(id, t);
-  return id;
-},
+    createTable({ seats=6, smallBet=1, bigBet=2, cap=4 }: { seats?: number; smallBet?: number; bigBet?: number; cap?: number; }) {
+      const id = randomId("td7_");
+      const seatObjs = Array.from({ length: seats }, (_, i) => ({
+        id: `p${i+1}`, stack: 100, inHand: true, drawsRemaining: 3,
+      }));
+    
+      const t: DrawTableState = {
+        id,
+        seats: seatObjs as any,
+        deck: [],
+        discards: [],
+        current: 0,
+        config: { smallBet, bigBet, cap },
+        round: undefined as any,
+        mode: "bet",
+        buttonIndex: 0,            // ★
+        blinds: { smallBlind: 1, bigBlind: 2 }, // ★（必要なら /table/new で受け取る）
+      };
+      tables.set(id, t);
+      return id;
+    }
+    ,
 
     /** 配札→プレドローベット開始 */
-  deal(tableId: string) {
-    const t = must(tableId);
-    t.deck = shuffle(freshDeck());
-    t.discards = [];
-    for (const s of t.seats) {
-      s.inHand = true;
-      s.drawsRemaining = 3;
-      (s as any).hand = drawFromDeck(t, 5) as [Card,Card,Card,Card,Card];
-    }
-    initBetRound(t, "pre");
-    // 二重防御（理論上不要だが安全策）
-    t.round.pot = 0;
-    t.round.currentBet = 0;
-    t.round.raises = 0;
-    t.round.committed = Object.fromEntries(t.seats.map(s => [s.id, 0]));
-    t.current = 0;
-    t.mode = "bet"; // ★ 配札直後はベットフェーズ
-    return { publicState: pub(t, t.seats[0].id) };
-  }
+    deal(tableId: string) {
+      const t = must(tableId);
+      t.deck = shuffle(freshDeck());
+      t.discards = [];
+    
+      for (const s of t.seats) {
+        s.inHand = true;
+        s.drawsRemaining = 3;
+        (s as any).hand = drawFromDeck(t, 5) as [Card,Card,Card,Card,Card];
+      }
+    
+      initBetRound(t, "pre");
+      t.mode = "bet";
+    
+      // ★ SB/BB の座席（ボタンの左がSB、その左がBB）
+      const sbIdx = (t.buttonIndex + 1) % t.seats.length;
+      const bbIdx = (t.buttonIndex + 2) % t.seats.length;
+      const sb = t.seats[sbIdx], bb = t.seats[bbIdx];
+    
+      // ★ コミット＆ポット反映（フォールド者は想定せず簡易）
+      t.round.committed[sb.id] += t.blinds.smallBlind;
+      t.round.committed[bb.id] += t.blinds.bigBlind;
+      t.round.pot += t.blinds.smallBlind + t.blinds.bigBlind;
+    
+      // ★ 現在の要求額はビッグブラインド額（= これがコール額）
+      t.round.currentBet = t.blinds.bigBlind;
+    
+      // ★ 最初に行動するのは BB の左（UTG）
+      t.current = (bbIdx + 1) % t.seats.length;
+    
+      return { publicState: pub(t, t.seats[0].id) };
+    }    
       ,
   
     /** ベットアクション（fold/check/call/bet/raise） */
@@ -272,16 +274,33 @@ action(tableId: string, playerId: string, action: LowballAction) {
     /** ショーダウン（単純比較。タイは等分等の分配は未実装の雛形） */
     showdown(tableId: string) {
       const t = must(tableId);
-      const alive = t.seats.filter((s) => s.inHand);
-      if (alive.length === 0) return { winners: [], reason: "all folded" };
-  
+      const alive = t.seats.filter(s => s.inHand);
+      if (alive.length === 0) return { winners: [], pot: t.round.pot, best: undefined };
+    
       const ranked = [...alive].sort((a, b) => cmp27(a.hand!, b.hand!));
       const best = ranked[0];
-      const winners = ranked
-        .filter((s) => cmp27(s.hand!, best.hand!) === 0)
-        .map((s) => s.id);
-      return { winners, pot: t.round.pot, best: best.hand };
-    },
+      const winners = ranked.filter(s => cmp27(s.hand!, best.hand!) === 0);
+    
+      // ★ 均等配分（端数は先着順で1点ずつ）
+      const pot = t.round.pot;
+      const share = Math.floor(pot / winners.length);
+      let rem = pot - share * winners.length;
+      for (const w of winners) {
+        w.stack += share + (rem > 0 ? 1 : 0);
+        if (rem > 0) rem--;
+      }
+    
+      // ★ 次ハンド準備（ボタン回す・状態初期化）
+      t.buttonIndex = (t.buttonIndex + 1) % t.seats.length;
+      t.round.pot = 0;
+      t.round.currentBet = 0;
+      t.round.raises = 0;
+      t.mode = "bet";
+      t.drawStart = undefined;
+    
+      return { winners: winners.map(w => w.id), pot, best: best.hand, stacks: Object.fromEntries(t.seats.map(s => [s.id, s.stack])) };
+    }    
+    ,
   
     /** 内部用：テーブルの生データ参照（AutoRunnerが使用） */
     _peek(tableId: string) {
@@ -294,4 +313,5 @@ action(tableId: string, playerId: string, action: LowballAction) {
       return pub(t, heroId);
     },
   };
+  
   

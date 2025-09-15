@@ -92,6 +92,10 @@ export interface DrawTableState {
   mode: "bet" | "draw";
   drawStart?: number;            // ★追加：このドローの開始位置
 
+    // ★ 追加
+  buttonIndex: number;
+  blinds: BlindsConfig;
+
 }
 
 // クライアントに返す公開情報（p1視点）
@@ -103,6 +107,11 @@ export interface DrawPublicState {
   toCall: number;
   street: DrawStreet;
   actionHistory: { seatId: string; a: LowballAction }[];
+}
+
+export interface BlindsConfig {
+  smallBlind: number; // 例: 1
+  bigBlind: number;   // 例: 2
 }
 
 

@@ -97,5 +97,15 @@ export function registerRoutes(app: FastifyInstance) {
     });
   });
   
+  app.post("/d27/state", async (req, rep) => {
+    const { tableId } = z.object({ tableId: z.string() }).parse(req.body);
+    return rep.send(TwoSevenGame.getPublicState(tableId, "p1"));
+  });
+
+  app.post("/d27/hand/new", async (req, rep) => {
+    const { tableId } = z.object({ tableId: z.string() }).parse(req.body);
+    const out = TwoSevenGame.deal(tableId);
+    return rep.send(out.publicState);
+  });
   
 }
