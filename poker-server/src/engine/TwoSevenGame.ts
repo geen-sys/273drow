@@ -209,6 +209,12 @@ action(tableId: string, playerId: string, action: LowballAction) {
       advanceTurn(t);            // ← 先に“次の人”へ
       t.mode = "draw";
       t.drawStart = t.current;   // ★この位置から一巡したらドロー完了
+      
+      // ★ ドローラウンド開始：生存者に 1 回分のドロー権を配る
+      for (const se of t.seats) {
+        if (se.inHand) se.drawsRemaining = 1;
+      }
+
       return { publicState: pub(t, playerId) };
     } else {
       advanceTurn(t);            // まだベット継続
@@ -271,6 +277,35 @@ action(tableId: string, playerId: string, action: LowballAction) {
       return { publicState: pub(t, playerId) };
     },
   
+    // これを TwoSevenGame の中に追加
+    getDebug(tableId: string) {
+      const t = must(tableId);
+
+      // round が未初期化でも安全に読む
+      const r = t.round ?? {
+        street: "pre" as const,
+        pot: 0,
+        currentBet: 0,
+        raises: 0,
+        cap: t.config?.cap ?? 4,
+        committed: {} as Record<string, number>,
+      };
+
+      const currentSeat = t.seats?.[t.current]?.id ?? "p1";
+
+      return {
+        street: r.street,
+        pot: r.pot ?? 0,
+        currentBet: r.currentBet ?? 0,
+        raises: r.raises ?? 0,
+        cap: t.config?.cap ?? 4,
+        committed: r.committed ?? {},
+        currentSeat,
+        mode: t.mode as "bet" | "draw" | undefined,
+        drawStart: t.drawStart,
+      };
+    },
+
     /** ショーダウン（単純比較。タイは等分等の分配は未実装の雛形） */
     showdown(tableId: string) {
       const t = must(tableId);
@@ -314,4 +349,4 @@ action(tableId: string, playerId: string, action: LowballAction) {
     },
   };
   
-  
+

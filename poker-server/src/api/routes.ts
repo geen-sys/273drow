@@ -51,21 +51,23 @@ export function registerRoutes(app: FastifyInstance) {
   // ドロー（0〜3枚捨て）
   // ※ p1 のドロー直後に、裏で p2〜p6 も自動ドロー＆次ベットを p1 の番まで進めます
   app.post("/d27/hand/draw", async (req, rep) => {
-    const body = z.object({
-      tableId: z.string(),
-      playerId: z.string(),
-      discard: z.array(CardSchema).max(3)   // ← string[] ではなく Card[] として受ける
-    }).parse(req.body);
+    try {
+      const body = z.object({
+        tableId: z.string(),
+        playerId: z.string(),
+        discard: z.array(CardSchema)  // あなたのカード型に合わせて
+      }).parse(req.body);
   
-    // もう型は Card[] なので、そのまま渡せる
-    TwoSevenGame.draw(body.tableId, body.playerId, body.discard);
-  
-    if (body.playerId === "p1") {
-      runAutoUntilP1(body.tableId);
+      const out = TwoSevenGame.draw(body.tableId, body.playerId, body.discard);
+      return rep.send(out.publicState);
+    } catch (e: any) {
+      const msg = e?.message || "draw failed";
+      const status = (msg === "not draw phase" || msg === "not your turn" || msg === "no draws remaining" || msg === "max 3 discards")
+        ? 400 : 500;
+      return rep.status(status).send({ message: msg });
     }
-    const state = TwoSevenGame.getPublicState(body.tableId, "p1");
-    return rep.send(state);
   });
+  
   
   // 任意のタイミングでショーダウン（結果を返す）
   app.post("/d27/showdown", async (req, rep) => {
@@ -83,18 +85,14 @@ export function registerRoutes(app: FastifyInstance) {
   });
 
   app.post("/d27/debug/round", async (req, rep) => {
-    const { tableId } = z.object({ tableId: z.string() }).parse(req.body);
-    // @ts-ignore 内部参照
-    const t = TwoSevenGame._peek(tableId);
-    return rep.send({
-      street: t.round.street,
-      pot: t.round.pot,
-      currentBet: t.round.currentBet,
-      raises: t.round.raises,
-      cap: t.config.cap,
-      committed: t.round.committed,
-      currentSeat: t.seats[t.current]?.id
-    });
+    try {
+      const body = z.object({ tableId: z.string() }).parse(req.body);
+      const dbg = TwoSevenGame.getDebug(body.tableId);
+      return rep.send(dbg);
+    } catch (e: any) {
+      // 500 にしない：デバッグ用途なので 400 でメッセージ返す
+      return rep.status(400).send({ message: e?.message || "debug unavailable" });
+    }
   });
   
   app.post("/d27/state", async (req, rep) => {
@@ -107,5 +105,5 @@ export function registerRoutes(app: FastifyInstance) {
     const out = TwoSevenGame.deal(tableId);
     return rep.send(out.publicState);
   });
-  
+
 }
