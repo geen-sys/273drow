@@ -41,8 +41,8 @@
   padding: 6px;
   border: 1px solid #333;
   border-radius: 6px;
-  background-color: #fff;   /* 白背景 */
-  color: #000;              /* 黒文字 */
+  background-color: #fff !important; /* ← ここ */
+  color: #000 !important;            /* ← ここ */
   font-weight: bold;
   font-size: 16px;
   text-align: center;
@@ -53,9 +53,9 @@
 }
 
 .card.selected {
-  background-color: #007bff; /* 青背景 */
-  color: #fff;               /* 白文字 */
-  border-color: #0056b3;
+  background-color: #007bff !important;
+  color: #fff !important;
+  border-color: #0056b3 !important;
 }
 
 .read-the-docs {

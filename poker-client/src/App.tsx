@@ -277,7 +277,12 @@ export default function App() {
                     type="button"
                     key={c}
                     onClick={() => toggleDiscard(c)}
-                    className={`card ${selected.includes(c) ? "selected" : ""}`}
+                    className={`inline-flex w-12 h-16 m-1 items-center justify-center
+                    rounded border font-bold text-lg cursor-pointer shadow
+                    ${on
+                      ? "bg-blue-600 text-white border-blue-800"
+                      : "bg-white text-black border-gray-500"
+                    }`}
                     title={on ? "Selected to discard" : "Click to discard"}
                   >
                     {c}
