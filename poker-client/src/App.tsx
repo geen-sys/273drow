@@ -33,7 +33,7 @@ type DebugRound = {
   cap: number;
   committed: Record<string, number>;
   currentSeat: string;            // 今の手番 (例: "p1")
-  mode?: "bet" | "draw";          // サーバが返すなら使用
+  mode?: "bet" | "draw" | "showdown";          // サーバが返すなら使用
   drawStart?: number;
 };
 
@@ -45,6 +45,15 @@ export default function App() {
   const [discards, setDiscards]   = useState<Card[]>([]);
   const [loading, setLoading]     = useState(false);
   const [err, setErr]             = useState<string>("");
+  // ★ Hook はコンポーネントの“直下”に置く（外に出さない）
+  const [selected, setSelected] = useState<string[]>([]);
+  const [hand, setHand] = useState<Card[]>(["Ah", "Kd", "7c", "3d", "9s"]); // 仮の手札（サーバ取得後は置き換え）
+
+  const toggleSelect = (card: string) => {
+    setSelected(prev =>
+      prev.includes(card) ? prev.filter(c => c !== card) : [...prev, card]
+    );
+  };
 
   // ---------- 便利参照 ----------
   const heroHand = state?.heroHand ?? [];
@@ -122,6 +131,7 @@ export default function App() {
       playerId: "p1",
       discard: discards,
     });
+    setSelected([]);//捨てた後は選択をリセット
     setState(st);
     setDiscards([]);
     await refreshDebug();
@@ -162,6 +172,7 @@ export default function App() {
   const isDrawPhase = debug?.mode === "draw";
   const isBetPhase  = debug?.mode === "bet";
   const isYourTurn  = debug?.currentSeat === "p1";
+  const isShowdown = debug?.mode === "showdown";
 
   const canCheck   = !!state && isBetPhase && isYourTurn && (state.toCall ?? 0) === 0;
   const canCall    = !!state && isBetPhase && isYourTurn && (state.toCall ?? 0) > 0;
@@ -247,6 +258,11 @@ export default function App() {
               ) : (
                 <span className="text-neutral-300">相手の番です。<b>Auto Run</b> を押すと p1 の番まで進みます。</span>
               )}
+              {isShowdown && (
+                <span className="text-emerald-300">
+                  ショウダウンです。「Showdown」ボタンを押して結果を表示してください。
+                </span>
+              )}
             </div>
           </div>
 
@@ -261,7 +277,7 @@ export default function App() {
                     type="button"
                     key={c}
                     onClick={() => toggleDiscard(c)}
-                    className={`px-3 py-2 rounded-xl border font-mono ${on ? "bg-yellow-600/30 border-yellow-600" : "bg-neutral-800 border-neutral-700 hover:bg-neutral-700"}`}
+                    className={`card ${selected.includes(c) ? "selected" : ""}`}
                     title={on ? "Selected to discard" : "Click to discard"}
                   >
                     {c}

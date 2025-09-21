@@ -76,6 +76,10 @@ export interface DrawRound {
   currentBet: number;                      // 現在要求されている合計額
   committed: Record<string, number>;       // 各席の当該ラウンド投入額
   raises: number;                          // bet/raise 回数（cap管理用）
+  /** このベットラウンドを開始した seat index（t.current）。一周判定用 */
+  firstToAct?: number;
+  /** 少なくとも誰かがこのラウンドで1回はアクションしたか */
+  didAct?: boolean;
 }
 
 // テーブル全体
@@ -89,7 +93,7 @@ export interface DrawTableState {
   config: LimitConfig;
 
   // ★ 追加：現在のフェーズ（ベット or ドロー）
-  mode: "bet" | "draw";
+  mode: "bet" | "draw" | "showdown";
   drawStart?: number;            // ★追加：このドローの開始位置
 
     // ★ 追加
@@ -114,4 +118,28 @@ export interface BlindsConfig {
   bigBlind: number;   // 例: 2
 }
 
+// ベットラウンドでUI/Botが参照する “単位ベット情報”
+export interface RoundAllowed {
+  /** 今ストリートのベット単位（pre/post1 は smallBet、post2/post3 は bigBet） */
+  bet: number;
+  /** レイズ時に上積みする単位。cap 到達で 0 にする */
+  raise: number;
+  /** 便宜上の基準値。各席の toCall は committed から別計算する */
+  call: number;
+  /** 0/1 フラグ（実際に押せるかは toCall===0 側で判定する前提） */
+  check: 0 | 1;
+}
+
+export interface RoundState {
+  street: DrawStreet;                     // pre → post1 → post2 → post3
+  pot: number;                            // ポット
+  currentBet: number;                     // そのラウンドの現在ベット額（単位）
+  raises: number;                         // そのラウンド中のレイズ回数（リミット想定）
+  cap: number;                            // レイズ上限（例: 4）
+  committed: Record<string, number>;      // seatId -> そのラウンドでの拠出額
+  allowed: RoundAllowed;                  // ベット単位など
+  // “すぐドローへ移ってしまう”問題を防ぐための補助フラグ
+  firstToAct?: number;                    // このラウンドを開始した seat index（t.current の値）
+  didAct?: boolean;                       // 少なくとも誰か1人が行動したか
+}
 

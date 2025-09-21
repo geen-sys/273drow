@@ -34,7 +34,28 @@
 }
 
 .card {
-  padding: 2em;
+  display: inline-block;
+  width: 48px;
+  height: 64px;
+  margin: 4px;
+  padding: 6px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background-color: #fff;   /* 白背景 */
+  color: #000;              /* 黒文字 */
+  font-weight: bold;
+  font-size: 16px;
+  text-align: center;
+  line-height: 48px;
+  box-shadow: 1px 1px 4px rgba(0,0,0,0.2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.card.selected {
+  background-color: #007bff; /* 青背景 */
+  color: #fff;               /* 白文字 */
+  border-color: #0056b3;
 }
 
 .read-the-docs {

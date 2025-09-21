@@ -76,13 +76,26 @@ export function registerRoutes(app: FastifyInstance) {
     return rep.send(result);
   });
 
-  // （オプション）p1の番まで強制的に自動で前進させるユーティリティ
   app.post("/d27/auto/run", async (req, rep) => {
-    const { tableId } = z.object({ tableId: z.string() }).parse(req.body);
-    runAutoUntilP1(tableId);
-    const state = TwoSevenGame.getPublicState(tableId, "p1");
-    return rep.send(state);
+    try {
+      const { tableId } = req.body as { tableId: string };
+      runAutoUntilP1(tableId);
+  
+      // ★ p1 視点の public state を返す
+      const ps = TwoSevenGame.getPublicState(tableId, "p1");
+      return rep.send(ps);
+    } catch (e: any) {
+      return rep.status(400).send({ message: e?.message ?? "auto run failed" });
+    }
   });
+  
+  // // （オプション）p1の番まで強制的に自動で前進させるユーティリティ
+  // app.post("/d27/auto/run", async (req, rep) => {
+  //   const { tableId } = z.object({ tableId: z.string() }).parse(req.body);
+  //   runAutoUntilP1(tableId);
+  //   const state = TwoSevenGame.getPublicState(tableId, "p1");
+  //   return rep.send(state);
+  // });
 
   app.post("/d27/debug/round", async (req, rep) => {
     try {

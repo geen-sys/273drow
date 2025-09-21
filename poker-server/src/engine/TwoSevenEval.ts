@@ -44,3 +44,4 @@ export function cmp27(a: [Card,Card,Card,Card,Card], b: [Card,Card,Card,Card,Car
   }
   return 0;
 }
+
