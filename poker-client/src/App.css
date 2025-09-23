@@ -121,3 +121,57 @@
 .playing-card.black{ color: #1f2937; }   /* スペード・クラブ */
 .playing-card .center.red   { color: #f3b4ad; }
 .playing-card .center.black { color: #cfd6df; }
+
+/* タイトル */
+.game-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.game-title .game-sub {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #9ca3af; /* neutral-400 */
+  border: 1px solid #374151; /* neutral-700 */
+  padding: 2px 8px;
+  border-radius: 999px;
+  transform: translateY(1px);
+}
+
+/* ショウダウン結果パネル */
+.result-panel {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(34, 197, 94, 0.08); /* emerald-ish */
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+.result-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.result-line {
+  font-size: 0.95rem;
+  margin: 2px 0;
+}
+.result-stacks {
+  margin-top: 6px; 
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 6px;
+}
+.stack-item {
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px; 
+  padding: 6px 8px;
+}
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* 既存 .btn はそのまま利用 */

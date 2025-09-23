@@ -39,6 +39,14 @@ type DebugRound = {
 
 // === 追加：カード描画ヘルパ ===
 type Suit = "s" | "h" | "d" | "c";
+
+type ShowdownResult = {
+  winners: string[];
+  pot: number;
+  best?: string[] | string;
+  stacks?: Record<string, number>;
+};
+
 const suitGlyph: Record<string, string> = { s: "♠", h: "♥", d: "♦", c: "♣" };
 
 
@@ -54,6 +62,7 @@ export default function App() {
   const [selected, setSelected] = useState<string[]>([]);
   const [hand, setHand] = useState<Card[]>(["Ah", "Kd", "7c", "3d", "9s"]); // 仮の手札（サーバ取得後は置き換え）
 
+  const [result, setResult] = useState<ShowdownResult | null>(null);
   const toggleSelect = (card: string) => {
     setSelected(prev =>
       prev.includes(card) ? prev.filter(c => c !== card) : [...prev, card]
@@ -126,6 +135,7 @@ async function onAutoRun() {
     const st = await callApi<PublicState>("/d27/hand/new", { tableId });
     setState(st);
     setDiscards([]);
+    setResult(null);       // ★ 前回の結果を消す
     await refreshDebug();
   }
 
@@ -169,8 +179,8 @@ async function onAutoRun() {
 
   async function onShowdown() {
     if (!tableId) return;
-    const r = await callApi<any>("/d27/showdown", { tableId });
-    alert(`Winners: ${r.winners?.join(", ")}\nPot: ${r.pot}\nBest: ${Array.isArray(r.best) ? r.best.join(" ") : r.best}\n${r.stacks ? "Stacks: " + JSON.stringify(r.stacks) : ""}`);
+    const r = await callApi<ShowdownResult>("/d27/showdown", { tableId });
+    setResult(r);          // ← ここで結果を保存
     await refreshDebug();
   }
 
@@ -184,6 +194,7 @@ async function onAutoRun() {
     }
   }
 
+  
   // ---------- 選択/表示ヘルパ ----------
   function toggleDiscard(card: Card) {
     setDiscards(prev => {
@@ -214,7 +225,10 @@ async function onAutoRun() {
   return (
     <div className="min-h-screen w-full bg-neutral-950 text-neutral-100 flex flex-col items-center p-6 gap-6">
       <div className="w-full max-w-4xl">
-        <h1 className="text-2xl font-semibold tracking-tight">Deuce-to-Seven Triple Draw — Minimal Client</h1>
+      <h1 className="game-title">
+          2–7 Triple Draw
+          <span className="game-sub"> prototype </span>
+        </h1>
         <p className="text-sm text-neutral-400">API: <span className="font-mono">{API_BASE || "(proxy)"}</span></p>
       </div>
 
@@ -295,6 +309,32 @@ async function onAutoRun() {
               )}
             </div>
           </div>
+
+          {/* === Result Panel === */}
+          {result && (
+            <div className="result-panel">
+              <div className="result-title">Showdown Result</div>
+              <div className="result-line"><b>Winners:</b> {result.winners.join(", ")}</div>
+              <div className="result-line"><b>Pot:</b> {result.pot}</div>
+              {result.best && (
+                <div className="result-line"><b>Best:</b> {Array.isArray(result.best) ? result.best.join(" ") : result.best}</div>
+              )}
+              {result.stacks && (
+                <div className="result-stacks">
+                  {Object.entries(result.stacks).map(([pid, chips]) => (
+                    <div key={pid} className="stack-item">
+                      <span className="mono">{pid}</span>
+                      <span className="mono">{chips}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="result-actions">
+                <button className="btn" onClick={() => setResult(null)}>Clear</button>
+                <button className="btn" onClick={onNewHand} disabled={!tableId}>New Hand</button>
+              </div>
+            </div>
+          )}
 
           {/* Hero Hand + Discard toggles */}
           <div className="mt-4">
