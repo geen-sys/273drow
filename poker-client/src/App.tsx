@@ -37,6 +37,11 @@ type DebugRound = {
   drawStart?: number;
 };
 
+// === 追加：カード描画ヘルパ ===
+type Suit = "s" | "h" | "d" | "c";
+const suitGlyph: Record<string, string> = { s: "♠", h: "♥", d: "♦", c: "♣" };
+
+
 export default function App() {
   // ---------- 状態 ----------
   const [tableId, setTableId]     = useState<string>("");
@@ -59,43 +64,62 @@ export default function App() {
   const heroHand = state?.heroHand ?? [];
 
   // ---------- 共通POST（ボディなしはヘッダーを付けない：空JSONエラー回避） ----------
-  async function callApi<T>(path: string, body?: any): Promise<T> {
-    setLoading(true);
-    setErr("");
-    try {
-      const init: RequestInit = { method: "POST" };
-      if (body !== undefined) {
-        init.headers = { "Content-Type": "application/json" };
-        init.body = JSON.stringify(body);
-      }
-      const res = await fetch(`${API_BASE}${path}`, init);
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.message || "HTTP error");
-      return json as T;
-    } catch (e: any) {
-      setErr(e?.message ?? String(e));
-      throw e;
-    } finally {
-      setLoading(false);
+  async function callApi<T = any>(path: string, body?: unknown): Promise<T> {
+    const res = await fetch(`http://localhost:8787${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : JSON.stringify({}), // ★ 空でも {} を送る
+    });
+    const text = await res.text(); // ★ 先に text を取る（エラー時も安全）
+    if (!res.ok) {
+      // サーバが {message} を返す想定
+      let msg = text;
+      try { const j = JSON.parse(text); if (j?.message) msg = j.message; } catch {}
+      throw new Error(`${res.status} ${res.statusText} - ${msg}`);
     }
+    try { return JSON.parse(text); } catch { return text as any; }
   }
+  
 
-  // ---------- API呼び出し ----------
-  async function onNewTable() {
-    const r = await callApi<{ tableId: string }>("/d27/table/new", {}); // {} を送るのが楽
-    setTableId(r.tableId);
+async function onNewTable() {
+  try {
+    const { tableId } = await callApi<{ tableId: string }>("/d27/table/new", {});
+    setTableId(tableId);
     setState(null);
-    setDiscards([]);
     setDebug(null);
+  } catch (e) {
+    console.error(e);
+    alert("New Table failed");
   }
+}
 
-  async function onDeal() {
-    if (!tableId) return;
-    const st = await callApi<PublicState>("/d27/hand/deal", { tableId });
-    setState(st);
-    setDiscards([]);
-    await refreshDebug();
+async function onDeal() {
+  if (!tableId) return alert("No table. New Table first.");
+  try {
+    const ps = await callApi<PublicState>("/d27/hand/deal", { tableId }); // ★ tableId を必ず送る
+    setState(ps);
+    const dbg = await callApi<DebugRound>("/d27/debug/round", { tableId });
+    setDebug(dbg);
+  } catch (e) {
+    console.error(e);
+    alert("Deal failed");
   }
+}
+
+async function onAutoRun() {
+  if (!tableId) return alert("No table. New Table first.");
+  try {
+    await callApi("/d27/auto/run", { tableId }); // ★ tableId を必ず送る
+    const ps = await callApi<PublicState>("/d27/state", { tableId, heroId: "p1" }).catch(() => null);
+    if (ps) setState(ps);
+    const dbg = await callApi<DebugRound>("/d27/debug/round", { tableId });
+    setDebug(dbg);
+  } catch (e) {
+    console.error(e);
+    alert("Auto Run failed");
+  }
+}
+
 
   async function onNewHand() {
     if (!tableId) return;
@@ -105,24 +129,30 @@ export default function App() {
     await refreshDebug();
   }
 
-  async function onAutoRun() {
-    if (!tableId) return;
-    const st = await callApi<PublicState>("/d27/auto/run", { tableId });
-    setState(st);
-    await refreshDebug();
+  async function act(kind: "bet" | "check" | "call" | "raise" | "fold") {
+    if (!state) return;
+    try {
+      // 行動 → PublicState が返る前提
+      const ps = await callApi<PublicState>("/d27/hand/action", {
+        tableId: state.tableId,
+        playerId: state.heroSeatId, // "p1"
+        action: kind,
+      });
+      setState(ps);                 // ★ ここで即反映
+  
+      // デバッグ情報も取り直す
+      await refreshDebug();
+  
+      // （任意）相手番を一気に進めたい場合
+      await callApi("/d27/auto/run", { tableId: state.tableId });
+      await refreshDebug();
+    } catch (e) {
+      console.error(e);
+      alert("action failed");
+    }
   }
-
-  async function act(a: "check" | "call" | "bet" | "raise" | "fold") {
-    if (!tableId) return;
-    const st = await callApi<PublicState>("/d27/hand/action", {
-      tableId,
-      playerId: "p1",
-      action: a,
-    });
-    setState(st);
-    setDiscards([]);
-    await refreshDebug();
-  }
+  
+  
 
   async function onDraw() {
     if (!tableId) return;
@@ -269,28 +299,38 @@ export default function App() {
           {/* Hero Hand + Discard toggles */}
           <div className="mt-4">
             <div className="text-sm text-neutral-400 mb-2">Click cards to select up to 3 for discard</div>
-            <div className="flex flex-wrap gap-2">
-              {heroHand.map((c) => {
-                const on = discards.includes(c);
-                return (
-                  <button
-                    type="button"
-                    key={c}
-                    onClick={() => toggleDiscard(c)}
-                    className={`inline-flex w-12 h-16 m-1 items-center justify-center
-                    rounded border font-bold text-lg cursor-pointer shadow
-                    ${on
-                      ? "bg-blue-600 text-white border-blue-800"
-                      : "bg-white text-black border-gray-500"
-                    }`}
-                    title={on ? "Selected to discard" : "Click to discard"}
-                  >
-                    {c}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+            {/* ★ 横並びにする行コンテナ（純CSS） */}
+            <div className="card-row">
+                {heroHand.map((c) => {
+                  const on = discards.includes(c);
+                  const { rank, suitChar, isRed } = splitCard(c);
+                  return (
+                    <div
+                      key={c}
+                      className={`playing-card ${on ? "selected" : ""} ${isRed ? "red" : "black"}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => toggleDiscard(c)}
+                      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && toggleDiscard(c)}
+                      title={on ? "Selected to discard" : "Click to discard"}
+                    >
+                      {/* 左上 */}
+                      <div className="corner tl">
+                        <div className="rank">{rank}</div>
+                        <div className="suit">{suitChar}</div>
+                      </div>
+                      {/* 右下 */}
+                      <div className="corner br">
+                        <div className="rank">{rank}</div>
+                        <div className="suit">{suitChar}</div>
+                      </div>
+                      {/* 中央の大きいスート（透かし色も赤/黒で変える） */}
+                      <div className={`center ${isRed ? "red" : "black"}`}>{suitChar}</div>
+                    </div>
+                  );
+                })}
+              </div>
+                        </div>
         </div>
 
         {/* Action history */}
@@ -333,4 +373,78 @@ export default function App() {
       `}</style>
     </div>
   );
+
+  function parseCard(c: string) {
+    const r = c[0]; // A,K,Q,J,T,9..2
+    const s = c[c.length - 1] as Suit; // s,h,d,c
+    const rank = r === "T" ? "10" : r;
+    const suitChar = { s: "♠", h: "♥", d: "♦", c: "♣" }[s];
+    const isRed = s === "h" || s === "d";
+    const suitColor = isRed ? "text-red-600" : "text-gray-800";
+    return { rank, suit: s, suitChar, isRed, suitColor };
+  }
+  
+  function PlayingCard({
+    card,
+    selected,
+    onClick,
+    title,
+  }: {
+    card: string;
+    selected?: boolean;
+    onClick?: () => void;
+    title?: string;
+  }) {
+    const { rank, suitChar, isRed, suitColor } = parseCard(card);
+  
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onClick}
+        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onClick?.()}
+        title={title}
+        className={[
+          // サイズ & 形
+          "relative w-24 h-36 rounded-2xl border shadow-lg select-none",
+          // ベース（紙っぽい）
+          "bg-white/95 border-gray-300",
+          "bg-gradient-to-br from-white to-neutral-100",
+          // クリック感
+          "cursor-pointer transition transform hover:-translate-y-0.5 active:translate-y-0",
+          // 選択時のハイライト
+          selected ? "ring-4 ring-blue-500" : "ring-1 ring-neutral-300",
+        ].join(" ")}
+        style={{ fontFeatureSettings: '"tnum" 1' }}
+      >
+        {/* 左上のランク/スート */}
+        <div className={`absolute top-2 left-2 text-left leading-none ${suitColor}`}>
+          <div className="font-black text-xl">{rank}</div>
+          <div className="text-lg -mt-0.5">{suitChar}</div>
+        </div>
+  
+        {/* 右下のランク/スート（180度回転） */}
+        <div className={`absolute bottom-2 right-2 text-right leading-none rotate-180 ${suitColor}`}>
+          <div className="font-black text-xl">{rank}</div>
+          <div className="text-lg -mt-0.5">{suitChar}</div>
+        </div>
+  
+        {/* 中央の大きめスート透かし */}
+        <div
+          className={[
+            "absolute inset-0 flex items-center justify-center pointer-events-none",
+            isRed ? "text-red-200" : "text-gray-300",
+          ].join(" ")}
+        >
+          <div className="text-5xl opacity-70">{suitChar}</div>
+        </div>
+      </div>
+    );
+  }
+  function splitCard(c: string) {
+    const r = c[0] === "T" ? "10" : c[0];         // T -> 10
+    const s = c[c.length - 1];                    // s|h|d|c
+    const isRed = s === "h" || s === "d";
+    return { rank: r, suit: s, suitChar: suitGlyph[s], isRed };
+  }
 }

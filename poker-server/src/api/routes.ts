@@ -18,19 +18,54 @@ export function registerRoutes(app: FastifyInstance) {
 
   // ===== 2–7 Triple Draw エンドポイント =====
 
-  // 卓作成（座席数・リミットは必要に応じて変更可能）
-  app.post("/d27/table/new", async (_req, rep) => {
-    const id = TwoSevenGame.createTable({ seats: 6, smallBet: 1, bigBet: 2, cap: 8 }); // ← 4→8
-    return rep.send({ tableId: id });
+  app.post("/d27/table/new", async (req, rep) => {
+    try {
+      // Bodyが空でもOKにするなら {} を許容
+      const body = (req.headers["content-type"]?.includes("application/json") && req.body) ? req.body : {};
+      const tableId = TwoSevenGame.createTable({}); // あなたの作り方に合わせて
+      return rep.send({ tableId });
+    } catch (e: any) {
+      return rep.status(500).send({ message: e?.message || "new table failed" });
+    }
   });
-
-  // 配札（各5枚）→ プレドロー・ベット開始（p1視点の公開状態を返す）
+  
   app.post("/d27/hand/deal", async (req, rep) => {
-    const { tableId } = z.object({ tableId: z.string() }).parse(req.body);
-    const out = TwoSevenGame.deal(tableId);
-    return rep.send(out.publicState);
+    try {
+      const body = z.object({ tableId: z.string() }).parse(req.body);
+      const out = TwoSevenGame.deal(body.tableId);
+      return rep.send(out.publicState ?? out); // 実装に合わせて
+    } catch (e: any) {
+      const msg = e?.message || "deal failed";
+      const status = /table|not found|parse/i.test(msg) ? 400 : 500;
+      return rep.status(status).send({ message: msg });
+    }
   });
-
+  
+  app.post("/d27/auto/run", async (req, rep) => {
+    try {
+      const body = z.object({ tableId: z.string() }).parse(req.body);
+      runAutoUntilP1(body.tableId);
+      const ps = TwoSevenGame.getPublicState(body.tableId, "p1");
+      return rep.send(ps);
+    } catch (e: any) {
+      const msg = e?.message || "auto run failed";
+      const status = /table|not found|parse/i.test(msg) ? 400 : 500;
+      return rep.status(status).send({ message: msg });
+    }
+  });
+  
+  app.post("/d27/debug/round", async (req, rep) => {
+    try {
+      const body = z.object({ tableId: z.string() }).parse(req.body);
+      const dbg = TwoSevenGame.getDebug(body.tableId); // 以前作ったやつ
+      return rep.send(dbg);
+    } catch (e: any) {
+      const msg = e?.message || "debug failed";
+      const status = /table|not found|parse/i.test(msg) ? 400 : 500;
+      return rep.status(status).send({ message: msg });
+    }
+  });
+  
   // ベットアクション（fold/check/call/bet/raise）
   // ※ p1 が行動した直後に、裏で p2〜p6 を自動進行して「次に p1 の番」まで回します
   app.post("/d27/hand/action", async (req, rep) => {
@@ -76,18 +111,6 @@ export function registerRoutes(app: FastifyInstance) {
     return rep.send(result);
   });
 
-  app.post("/d27/auto/run", async (req, rep) => {
-    try {
-      const { tableId } = req.body as { tableId: string };
-      runAutoUntilP1(tableId);
-  
-      // ★ p1 視点の public state を返す
-      const ps = TwoSevenGame.getPublicState(tableId, "p1");
-      return rep.send(ps);
-    } catch (e: any) {
-      return rep.status(400).send({ message: e?.message ?? "auto run failed" });
-    }
-  });
   
   // // （オプション）p1の番まで強制的に自動で前進させるユーティリティ
   // app.post("/d27/auto/run", async (req, rep) => {
@@ -96,17 +119,6 @@ export function registerRoutes(app: FastifyInstance) {
   //   const state = TwoSevenGame.getPublicState(tableId, "p1");
   //   return rep.send(state);
   // });
-
-  app.post("/d27/debug/round", async (req, rep) => {
-    try {
-      const body = z.object({ tableId: z.string() }).parse(req.body);
-      const dbg = TwoSevenGame.getDebug(body.tableId);
-      return rep.send(dbg);
-    } catch (e: any) {
-      // 500 にしない：デバッグ用途なので 400 でメッセージ返す
-      return rep.status(400).send({ message: e?.message || "debug unavailable" });
-    }
-  });
   
   app.post("/d27/state", async (req, rep) => {
     const { tableId } = z.object({ tableId: z.string() }).parse(req.body);

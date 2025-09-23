@@ -175,36 +175,43 @@ import {
     /** 配札→プレドローベット開始 */
     deal(tableId: string) {
       const t = must(tableId);
+    
+      // デッキ/手札配り
       t.deck = shuffle(freshDeck());
       t.discards = [];
-    
       for (const s of t.seats) {
         s.inHand = true;
         s.drawsRemaining = 3;
         (s as any).hand = drawFromDeck(t, 5) as [Card,Card,Card,Card,Card];
       }
     
-      initBetRound(t, "pre");
-      t.mode = "bet";
-    
-      // ★ SB/BB の座席（ボタンの左がSB、その左がBB）
+      // ボタン基準で SB / BB を決定
       const sbIdx = (t.buttonIndex + 1) % t.seats.length;
       const bbIdx = (t.buttonIndex + 2) % t.seats.length;
       const sb = t.seats[sbIdx], bb = t.seats[bbIdx];
     
-      // ★ コミット＆ポット反映（フォールド者は想定せず簡易）
-      t.round.committed[sb.id] += t.blinds.smallBlind;
-      t.round.committed[bb.id] += t.blinds.bigBlind;
-      t.round.pot += t.blinds.smallBlind + t.blinds.bigBlind;
+      // ★ まずラウンドを初期化（空）
+      initBetRound(t, "pre");
     
-      // ★ 現在の要求額はビッグブラインド額（= これがコール額）
+      // ★ ブラインドを committed / pot / currentBet に反映
+      const add = (id: string, amt: number) => {
+        t.round.committed[id] = (t.round.committed[id] ?? 0) + amt;
+      };
+      add(sb.id, t.blinds.smallBlind);
+      add(bb.id, t.blinds.bigBlind);
+      t.round.pot += t.blinds.smallBlind + t.blinds.bigBlind;
       t.round.currentBet = t.blinds.bigBlind;
     
-      // ★ 最初に行動するのは BB の左（UTG）
+      // ★ 最初に行動するのは BB の左（= UTG）
       t.current = (bbIdx + 1) % t.seats.length;
+      t.round.firstToAct = t.current;   // ← 一周判定用
     
-      return { publicState: pub(t, t.seats[0].id) };
-    }    
+      // allowed 更新（スモール/ビッグの単位を street で切替しているならそのロジックで）
+      updateAllowed(t);  // なければ省略可。あれば bet/raise 単位を設定。
+    
+      t.mode = "bet";
+      return { publicState: pub(t, t.seats[0].id) }; // heroId はあなたの実装に合わせて
+    }        
       ,
   
     /** ベットアクション（fold/check/call/bet/raise） */
