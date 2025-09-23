@@ -236,13 +236,13 @@ async function onAutoRun() {
       <div className="w-full max-w-4xl grid grid-cols-2 md:grid-cols-3 gap-2">
         <button className="btn" onClick={onNewTable} disabled={loading}>New Table</button>
         <button className="btn" onClick={onDeal} disabled={!tableId || loading}>Deal</button>
-        <button className="btn" onClick={onAutoRun} disabled={!tableId || loading || isYourTurn}>Auto Run (to p1)</button>
+        <button className="btn" onClick={onAutoRun} disabled={!tableId || loading || isYourTurn || isShowdown}>Auto Run (to p1)</button>
 
-        <button className="btn" onClick={() => act("check")} disabled={!canCheck || loading} title={!canCheck ? "自分の番のベットフェーズで、toCall=0の時だけ" : ""}>Check</button>
-        <button className="btn" onClick={() => act("call")} disabled={!canCall || loading} title={!canCall ? "自分の番のベットフェーズで、コール額がある時だけ" : ""}>Call {state?.toCall ? `(${state?.toCall})` : ""}</button>
-        <button className="btn" onClick={() => act("bet")} disabled={!canBet || loading} title={!canBet ? "自分の番のベットフェーズで、未ベット時のみ" : ""}>Bet</button>
-        <button className="btn" onClick={() => act("raise")} disabled={!canRaise || loading} title={!canRaise ? "自分の番のベットフェーズで、ベットがありcap未到達の時" : ""}>Raise</button>
-        <button className="btn !bg-red-600 hover:!bg-red-700" onClick={() => act("fold")} disabled={!canFold || loading} title="ベットフェーズ中のみ">Fold</button>
+        <button className="btn" onClick={() => act("check")} disabled={!canCheck || loading || isShowdown} title={!canCheck ? "自分の番のベットフェーズで、toCall=0の時だけ" : ""}>Check</button>
+        <button className="btn" onClick={() => act("call")} disabled={!canCall || loading || isShowdown} title={!canCall ? "自分の番のベットフェーズで、コール額がある時だけ" : ""}>Call {state?.toCall ? `(${state?.toCall})` : ""}</button>
+        <button className="btn" onClick={() => act("bet")} disabled={!canBet || loading || isShowdown} title={!canBet ? "自分の番のベットフェーズで、未ベット時のみ" : ""}>Bet</button>
+        <button className="btn" onClick={() => act("raise")} disabled={!canRaise || loading || isShowdown} title={!canRaise ? "自分の番のベットフェーズで、ベットがありcap未到達の時" : ""}>Raise</button>
+        <button className="btn !bg-red-600 hover:!bg-red-700" onClick={() => act("fold")} disabled={!canFold || loading || isShowdown} title="ベットフェーズ中のみ">Fold</button>
 
         <button
           type="button"
@@ -279,7 +279,7 @@ async function onAutoRun() {
             <div>Hero: <span className="font-mono">{state?.heroSeatId ?? "p1"}</span></div>
           </div>
 
-          {/* 状況ガイド */}
+          {/* 状況ガイド（ショウダウン優先） */}
           <div className="mt-3 p-3 rounded-xl border border-neutral-800 bg-neutral-900/60">
             <div className="text-sm">
               <span className="mr-2">Phase: <span className="font-mono">{debug?.mode ?? "—"}</span></span>
@@ -288,10 +288,18 @@ async function onAutoRun() {
               <span className="mr-2">CurrentBet: <span className="font-mono">{debug?.currentBet ?? 0}</span></span>
               <span className="mr-2">Pot: <span className="font-mono">{state?.pot ?? 0}</span></span>
             </div>
+
             <div className="text-sm mt-2">
-              {isYourTurn ? (
+              {isShowdown ? (
+                // ★ ショウダウン最優先：相手ターンの文言は出さない
+                <span className="text-emerald-300">
+                  ショウダウンです。「Showdown」ボタンを押して結果を表示してください。
+                </span>
+              ) : isYourTurn ? (
                 isDrawPhase ? (
-                  <span className="text-emerald-300">あなたの番：ドローフェーズです。捨て札を最大3枚クリック → 「Draw」を押してください。</span>
+                  <span className="text-emerald-300">
+                    あなたの番：ドローフェーズです。捨て札を最大3枚クリック → 「Draw」を押してください。
+                  </span>
                 ) : isBetPhase ? (
                   (state?.toCall ?? 0) > 0
                     ? <span className="text-emerald-300">あなたの番：{state?.toCall} をコール、またはレイズ/フォールドができます。</span>
@@ -300,15 +308,14 @@ async function onAutoRun() {
                   <span className="text-yellow-300">フェーズ情報が未取得です（Refresh Debug を押してください）。</span>
                 )
               ) : (
-                <span className="text-neutral-300">相手の番です。<b>Auto Run</b> を押すと p1 の番まで進みます。</span>
-              )}
-              {isShowdown && (
-                <span className="text-emerald-300">
-                  ショウダウンです。「Showdown」ボタンを押して結果を表示してください。
+                // 相手の番の案内（※ショウダウン時はここに来ない）
+                <span className="text-neutral-300">
+                  相手の番です。<b>Auto Run</b> を押すと p1 の番まで進みます。
                 </span>
               )}
             </div>
           </div>
+
 
           {/* === Result Panel === */}
           {result && (
