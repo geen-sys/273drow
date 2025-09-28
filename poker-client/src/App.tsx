@@ -211,7 +211,7 @@ async function onAutoRun() {
 
   return (
     <div className="min-h-screen w-full bg-neutral-950 text-neutral-100 flex flex-col items-center p-6 gap-6">
-      <div className="w-full max-w-4xl">
+      <div className="w-full max-w-6xl">
       <h1 className="game-title">
           2–7 Triple Draw
           <span className="game-sub"> prototype </span>
@@ -220,7 +220,7 @@ async function onAutoRun() {
       </div>
 
       {/* Controls */}
-      <div className="w-full max-w-4xl grid grid-cols-2 md:grid-cols-3 gap-2">
+      <div className="w-full max-w-6xl grid grid-cols-2 md:grid-cols-3 gap-2">
         <button className="btn" onClick={onNewTable} disabled={loading}>New Table</button>
         <button className="btn" onClick={onDeal} disabled={!tableId || loading}>Deal</button>
         <button className="btn" onClick={onAutoRun} disabled={!tableId || loading || isYourTurn || isShowdown}>Auto Run (to p1)</button>
@@ -247,33 +247,34 @@ async function onAutoRun() {
       </div>
 
       {err && (
-        <div className="w-full max-w-4xl bg-red-950/50 border border-red-700 text-red-200 rounded-xl p-3">
+        <div className="w-full max-w-6xl bg-red-950/50 border border-red-700 text-red-200 rounded-xl p-3">
           <div className="font-semibold">Error</div>
           <div className="text-sm whitespace-pre-wrap">{err}</div>
         </div>
       )}
 
       {/* Table + Hand */}
-      <div className="w-full max-w-4xl grid gap-4">
+      <div className="w-full max-w-6xl grid gap-4">
         <div className="bg-neutral-900/60 rounded-2xl p-4 border border-neutral-800">
-          <div className="flex justify-between items-center">
-            <div className="text-lg font-medium">Table: <span className="font-mono">{tableId || "—"}</span></div>
-            <div className="text-sm text-neutral-400">Street: <span className="font-mono">{state?.street ?? "—"}</span></div>
+          {/* 横並びのサマリー（モバイルは自動折返し） */}
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+            <div className="stat"><span className="stat-k">テーブル</span><span className="stat-v font-mono">{tableId || "—"}</span></div>
+            <div className="stat"><span className="stat-k">ストリート</span><span className="stat-v font-mono">{state?.street ?? "—"}</span></div>
+            <div className="stat"><span className="stat-k">ポット</span><span className="stat-v font-mono">{state?.pot ?? 0}</span></div>
+            <div className="stat"><span className="stat-k">コール額</span><span className="stat-v font-mono">{state?.toCall ?? 0}</span></div>
+            <div className="stat"><span className="stat-k">席</span><span className="stat-v font-mono">{state?.heroSeatId ?? "p1"}</span></div>
+            <div className="stat"><span className="stat-k">フェーズ</span><span className="stat-v font-mono">{debug?.mode ?? "—"}</span></div>
           </div>
-          <div className="mt-2 flex flex-wrap gap-4 text-sm">
-            <div>Pot: <span className="font-mono">{state?.pot ?? 0}</span></div>
-            <div>To Call: <span className="font-mono">{state?.toCall ?? 0}</span></div>
-            <div>Hero: <span className="font-mono">{state?.heroSeatId ?? "p1"}</span></div>
-          </div>
+
 
           {/* 状況ガイド（ショウダウン優先） */}
           <div className="mt-3 p-3 rounded-xl border border-neutral-800 bg-neutral-900/60">
             <div className="text-sm">
-              <span className="mr-2">Phase: <span className="font-mono">{debug?.mode ?? "—"}</span></span>
-              <span className="mr-2">Turn: <span className="font-mono">{debug?.currentSeat ?? "—"}</span></span>
-              <span className="mr-2">Raises: <span className="font-mono">{debug?.raises ?? 0}/{debug?.cap ?? "?"}</span></span>
-              <span className="mr-2">CurrentBet: <span className="font-mono">{debug?.currentBet ?? 0}</span></span>
-              <span className="mr-2">Pot: <span className="font-mono">{state?.pot ?? 0}</span></span>
+              <span className="mr-2">フェーズ: <span className="font-mono">{debug?.mode ?? "—"}</span></span>
+              <span className="mr-2">手番: <span className="font-mono">{debug?.currentSeat ?? "—"}</span></span>
+              <span className="mr-2">レイズ数: <span className="font-mono">{debug?.raises ?? 0}/{debug?.cap ?? "?"}</span></span>
+              <span className="mr-2">現在ベット: <span className="font-mono">{debug?.currentBet ?? 0}</span></span>
+              <span className="mr-2">ポット: <span className="font-mono">{state?.pot ?? 0}</span></span>
             </div>
 
             <div className="text-sm mt-2">
@@ -332,7 +333,7 @@ async function onAutoRun() {
 
           {/* Hero Hand + Discard toggles */}
           <div className="mt-4">
-            <div className="text-sm text-neutral-400 mb-2">Click cards to select up to 3 for discard</div>
+            <div className="text-sm text-neutral-400 mb-2">捨て札にするカードを最大 3 枚までクリック</div>
             {/* ★ 横並びにする行コンテナ（純CSS） */}
             <div className="card-row">
                 {heroHand.map((c) => {
@@ -365,14 +366,15 @@ async function onAutoRun() {
                 })}
               </div>
                         </div>
+
         </div>
 
         {/* Action history */}
         <div className="bg-neutral-900/60 rounded-2xl p-4 border border-neutral-800">
-          <div className="text-lg font-medium mb-2">Action History (this round)</div>
+          <div className="text-lg font-medium mb-2">このラウンドのアクション履歴</div>
           <div className="flex flex-col gap-1 text-sm max-h-48 overflow-auto">
             {(state?.actionHistory ?? []).length === 0 && (
-              <div className="text-neutral-500">— no actions yet —</div>
+              <div className="text-neutral-500">（まだアクションはありません）</div>
             )}
             {(state?.actionHistory ?? []).map((h, i) => (
               <div key={i} className="font-mono">
@@ -404,6 +406,16 @@ async function onAutoRun() {
           opacity: 0.5;
           cursor: not-allowed;
         }
+        .stat{
+          display:inline-flex;align-items:center;gap:.35rem;
+          padding:.25rem .5rem;border:1px solid #303030;
+          background:#0b0b0b;border-radius:.5rem;
+        }
+        .stat-k{ color:#9ca3af; font-size:.75rem; }
+        .stat-v{ margin-left:.1rem; }
+        @media (min-width:1024px){
+          .stat{ padding:.35rem .6rem; }
+        }        
       `}</style>
     </div>
   );
