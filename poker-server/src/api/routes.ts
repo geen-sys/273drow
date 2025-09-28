@@ -18,15 +18,11 @@ export function registerRoutes(app: FastifyInstance) {
 
   // ===== 2–7 Triple Draw エンドポイント =====
 
-  app.post("/d27/table/new", async (req, rep) => {
-    try {
-      // Bodyが空でもOKにするなら {} を許容
-      const body = (req.headers["content-type"]?.includes("application/json") && req.body) ? req.body : {};
-      const tableId = TwoSevenGame.createTable({}); // あなたの作り方に合わせて
-      return rep.send({ tableId });
-    } catch (e: any) {
-      return rep.status(500).send({ message: e?.message || "new table failed" });
-    }
+  app.post("/d27/table/new", async (req, reply) => {
+    // body: { seats?: number }
+    const body = (req.body ?? {}) as { seats?: number };
+    const tableId = TwoSevenGame.createTable({ seats: body.seats ?? 4 }); // ★デフォルト4人
+    reply.send({ tableId });
   });
   
   app.post("/d27/hand/deal", async (req, rep) => {
@@ -105,11 +101,22 @@ export function registerRoutes(app: FastifyInstance) {
   
   
   // 任意のタイミングでショーダウン（結果を返す）
-  app.post("/d27/showdown", async (req, rep) => {
-    const { tableId } = z.object({ tableId: z.string() }).parse(req.body);
-    const result = TwoSevenGame.showdown(tableId);
-    return rep.send(result);
+  app.post("/d27/showdown", async (req, reply) => {
+    const body = req.body as { tableId: string };
+    const result = TwoSevenGame.showdown(body.tableId);
+  
+    // t を覗けるヘルパ（あなたの既存コードに合わせて取得）
+    const t = TwoSevenGame._peek(body.tableId);
+  
+    // 全員の手札（ショウダウン時のみ）
+    const hands = Object.fromEntries(
+      t.seats.map((s: any) => [s.id, s.hand]) // hand: ["As","Kd",...]
+    );
+  
+    // 既存の result に hands を足して返す
+    reply.send({ ...result, hands });
   });
+  
 
   
   // // （オプション）p1の番まで強制的に自動で前進させるユーティリティ

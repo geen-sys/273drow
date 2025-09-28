@@ -46,7 +46,6 @@ type ShowdownResult = {
 
 const suitGlyph: Record<string, string> = { s: "♠", h: "♥", d: "♦", c: "♣" };
 
-
 export default function App() {
   // ---------- 状態 ----------
   const [tableId, setTableId]     = useState<string>("");
@@ -61,6 +60,8 @@ export default function App() {
 
   // ---------- 便利参照 ----------
   const heroHand = state?.heroHand ?? [];
+
+  const [revealedHands, setRevealedHands] = useState<Record<string, Card[]> | null>(null);
 
   // ---------- 共通POST（ボディなしはヘッダーを付けない：空JSONエラー回避） ----------
   async function callApi<T = any>(path: string, body?: unknown): Promise<T> {
@@ -92,10 +93,11 @@ export default function App() {
 
 async function onNewTable() {
   try {
-    const { tableId } = await callApi<{ tableId: string }>("/d27/table/new", {});
+    const { tableId } = await callApi<{ tableId: string }>("/d27/table/new", { seats: 4 });
     setTableId(tableId);
     setState(null);
     setDebug(null);
+    setRevealedHands(null);
   } catch {}
 }
 
@@ -127,6 +129,7 @@ async function onAutoRun() {
     setState(st);
     setDiscards([]);
     setResult(null);       // ★ 前回の結果を消す
+    setRevealedHands(null);
     await refreshDebug();
   }
 
@@ -166,8 +169,11 @@ async function onAutoRun() {
 
   async function onShowdown() {
     if (!tableId) return;
-    const r = await callApi<ShowdownResult>("/d27/showdown", { tableId });
-    setResult(r);          // ← ここで結果を保存
+    const r = await callApi<any>("/d27/showdown", { tableId });
+    // 画面内パネル表示用（既存の result を使っているならそれも維持OK）
+    setResult(r);
+    // ★ 全員の手札
+    if (r.hands) setRevealedHands(r.hands);
     await refreshDebug();
   }
 
@@ -369,6 +375,31 @@ async function onAutoRun() {
 
         </div>
 
+        {/* === Opponents (showdown only) === */}
+        {revealedHands && (
+          <div className="bg-neutral-900/60 rounded-2xl p-4 border border-neutral-800">
+            <div className="text-lg font-medium mb-3">ショウダウン結果（相手の手札）</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {["p2","p3","p4"].map((pid) => {
+                const cards = (revealedHands?.[pid] ?? []) as Card[];
+                return (
+                  <div key={pid} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="font-medium">{pid}</div>
+                    </div>
+                    {/* ★ 横並びで大きいカードを5枚 */}
+                    <div className="big-hand-row">
+                      {cards.map((c, i) => (
+                        <BigCard key={`${pid}-${i}-${c}`} card={c}/>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Action history */}
         <div className="bg-neutral-900/60 rounded-2xl p-4 border border-neutral-800">
           <div className="text-lg font-medium mb-2">このラウンドのアクション履歴</div>
@@ -415,7 +446,12 @@ async function onAutoRun() {
         .stat-v{ margin-left:.1rem; }
         @media (min-width:1024px){
           .stat{ padding:.35rem .6rem; }
-        }        
+        }       
+        .hand-row { display: flex; flex-direction: row; align-items: center; gap: 4px; }
+        .drop-shadow { filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
+        .big-hand-row { display:flex; flex-direction:row; align-items:center; gap:8px; flex-wrap:wrap; }
+        .big-card { border-radius: 10px; }
+        .drop-shadow { filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
       `}</style>
     </div>
   );
@@ -426,4 +462,31 @@ async function onAutoRun() {
     const isRed = s === "h" || s === "d";
     return { rank: r, suit: s, suitChar: suitGlyph[s], isRed };
   }
+}
+
+
+function BigCard({ card }: { card: Card }) {
+  const r = card[0]; // 'A','K','Q','J','T','9'...'2'
+  const s = card[1]; // 'h','d','c','s'
+  const suitMap: Record<string, string> = { h: "♥", d: "♦", c: "♣", s: "♠" };
+  const isRed = s === "h" || s === "d";
+
+  return (
+    <svg width="72" height="100" viewBox="0 0 72 100" className="big-card drop-shadow">
+      <rect x="0.75" y="0.75" width="70.5" height="98.5" rx="8" fill="#ffffff"/>
+      <rect x="0.75" y="0.75" width="70.5" height="98.5" rx="8" stroke="#d1d5db" fill="none"/>
+      {/* 左上 */}
+      <text x="6" y="18" fontSize="18" fontWeight="700" fill={isRed ? "#dc2626" : "#111827"}>{r}</text>
+      <text x="6" y="34" fontSize="18" fill={isRed ? "#dc2626" : "#111827"}>{suitMap[s]}</text>
+      {/* 右下（反転） */}
+      <g transform="translate(66,94) rotate(180)">
+        <text x="0" y="0" fontSize="18" fontWeight="700" textAnchor="end" fill={isRed ? "#dc2626" : "#111827"}>{r}</text>
+        <text x="0" y="16" fontSize="18" textAnchor="end" fill={isRed ? "#dc2626" : "#111827"}>{suitMap[s]}</text>
+      </g>
+      {/* 中央の大きいスート薄色 */}
+      <text x="36" y="56" textAnchor="middle" fontSize="36" opacity="0.15" fill={isRed ? "#ef4444" : "#111827"}>
+        {suitMap[s]}
+      </text>
+    </svg>
+  );
 }
