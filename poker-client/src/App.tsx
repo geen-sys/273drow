@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 
 // ===== Deuce-to-Seven Triple Draw — Minimal Client (App.tsx) =====
 // サーバAPI: /d27/table/new, /d27/hand/deal, /d27/auto/run, /d27/hand/action, /d27/hand/draw, /d27/showdown, /d27/hand/new, /d27/debug/round
@@ -37,9 +37,6 @@ type DebugRound = {
   drawStart?: number;
 };
 
-// === 追加：カード描画ヘルパ ===
-type Suit = "s" | "h" | "d" | "c";
-
 type ShowdownResult = {
   winners: string[];
   pot: number;
@@ -59,35 +56,38 @@ export default function App() {
   const [loading, setLoading]     = useState(false);
   const [err, setErr]             = useState<string>("");
   // ★ Hook はコンポーネントの“直下”に置く（外に出さない）
-  const [selected, setSelected] = useState<string[]>([]);
-  const [hand, setHand] = useState<Card[]>(["Ah", "Kd", "7c", "3d", "9s"]); // 仮の手札（サーバ取得後は置き換え）
 
   const [result, setResult] = useState<ShowdownResult | null>(null);
-  const toggleSelect = (card: string) => {
-    setSelected(prev =>
-      prev.includes(card) ? prev.filter(c => c !== card) : [...prev, card]
-    );
-  };
 
   // ---------- 便利参照 ----------
   const heroHand = state?.heroHand ?? [];
 
   // ---------- 共通POST（ボディなしはヘッダーを付けない：空JSONエラー回避） ----------
   async function callApi<T = any>(path: string, body?: unknown): Promise<T> {
-    const res = await fetch(`http://localhost:8787${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: body ? JSON.stringify(body) : JSON.stringify({}), // ★ 空でも {} を送る
-    });
-    const text = await res.text(); // ★ 先に text を取る（エラー時も安全）
-    if (!res.ok) {
-      // サーバが {message} を返す想定
-      let msg = text;
-      try { const j = JSON.parse(text); if (j?.message) msg = j.message; } catch {}
-      throw new Error(`${res.status} ${res.statusText} - ${msg}`);
+    setLoading(true);
+    setErr("");
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : JSON.stringify({}),
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        let msg = text;
+        try { const j = JSON.parse(text); if (j?.message) msg = j.message; } catch {}
+        throw new Error(`${res.status} ${res.statusText} - ${msg}`);
+      }
+      try { return JSON.parse(text); } catch { return text as any; }
+    } catch (e: any) {
+      const m = e?.message ?? String(e);
+      setErr(m);            // ★ 画面下部のエラーパネルに表示される想定
+      throw e;
+    } finally {
+      setLoading(false);
     }
-    try { return JSON.parse(text); } catch { return text as any; }
   }
+  
   
 
 async function onNewTable() {
@@ -96,10 +96,7 @@ async function onNewTable() {
     setTableId(tableId);
     setState(null);
     setDebug(null);
-  } catch (e) {
-    console.error(e);
-    alert("New Table failed");
-  }
+  } catch {}
 }
 
 async function onDeal() {
@@ -109,10 +106,7 @@ async function onDeal() {
     setState(ps);
     const dbg = await callApi<DebugRound>("/d27/debug/round", { tableId });
     setDebug(dbg);
-  } catch (e) {
-    console.error(e);
-    alert("Deal failed");
-  }
+  } catch {}
 }
 
 async function onAutoRun() {
@@ -123,10 +117,7 @@ async function onAutoRun() {
     if (ps) setState(ps);
     const dbg = await callApi<DebugRound>("/d27/debug/round", { tableId });
     setDebug(dbg);
-  } catch (e) {
-    console.error(e);
-    alert("Auto Run failed");
-  }
+  } catch {}
 }
 
 
@@ -156,10 +147,7 @@ async function onAutoRun() {
       // （任意）相手番を一気に進めたい場合
       await callApi("/d27/auto/run", { tableId: state.tableId });
       await refreshDebug();
-    } catch (e) {
-      console.error(e);
-      alert("action failed");
-    }
+    } catch {}
   }
   
   
@@ -171,7 +159,6 @@ async function onAutoRun() {
       playerId: "p1",
       discard: discards,
     });
-    setSelected([]);//捨てた後は選択をリセット
     setState(st);
     setDiscards([]);
     await refreshDebug();
@@ -420,74 +407,7 @@ async function onAutoRun() {
       `}</style>
     </div>
   );
-
-  function parseCard(c: string) {
-    const r = c[0]; // A,K,Q,J,T,9..2
-    const s = c[c.length - 1] as Suit; // s,h,d,c
-    const rank = r === "T" ? "10" : r;
-    const suitChar = { s: "♠", h: "♥", d: "♦", c: "♣" }[s];
-    const isRed = s === "h" || s === "d";
-    const suitColor = isRed ? "text-red-600" : "text-gray-800";
-    return { rank, suit: s, suitChar, isRed, suitColor };
-  }
   
-  function PlayingCard({
-    card,
-    selected,
-    onClick,
-    title,
-  }: {
-    card: string;
-    selected?: boolean;
-    onClick?: () => void;
-    title?: string;
-  }) {
-    const { rank, suitChar, isRed, suitColor } = parseCard(card);
-  
-    return (
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onClick}
-        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onClick?.()}
-        title={title}
-        className={[
-          // サイズ & 形
-          "relative w-24 h-36 rounded-2xl border shadow-lg select-none",
-          // ベース（紙っぽい）
-          "bg-white/95 border-gray-300",
-          "bg-gradient-to-br from-white to-neutral-100",
-          // クリック感
-          "cursor-pointer transition transform hover:-translate-y-0.5 active:translate-y-0",
-          // 選択時のハイライト
-          selected ? "ring-4 ring-blue-500" : "ring-1 ring-neutral-300",
-        ].join(" ")}
-        style={{ fontFeatureSettings: '"tnum" 1' }}
-      >
-        {/* 左上のランク/スート */}
-        <div className={`absolute top-2 left-2 text-left leading-none ${suitColor}`}>
-          <div className="font-black text-xl">{rank}</div>
-          <div className="text-lg -mt-0.5">{suitChar}</div>
-        </div>
-  
-        {/* 右下のランク/スート（180度回転） */}
-        <div className={`absolute bottom-2 right-2 text-right leading-none rotate-180 ${suitColor}`}>
-          <div className="font-black text-xl">{rank}</div>
-          <div className="text-lg -mt-0.5">{suitChar}</div>
-        </div>
-  
-        {/* 中央の大きめスート透かし */}
-        <div
-          className={[
-            "absolute inset-0 flex items-center justify-center pointer-events-none",
-            isRed ? "text-red-200" : "text-gray-300",
-          ].join(" ")}
-        >
-          <div className="text-5xl opacity-70">{suitChar}</div>
-        </div>
-      </div>
-    );
-  }
   function splitCard(c: string) {
     const r = c[0] === "T" ? "10" : c[0];         // T -> 10
     const s = c[c.length - 1];                    // s|h|d|c

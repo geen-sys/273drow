@@ -8,7 +8,15 @@ import "./App.css";
 // ★ 追加：vite-plugin-pwa が生成する仮想モジュール
 import { registerSW } from "virtual:pwa-register";
 
-registerSW({ immediate: true }); // 新SWが来たら自動で更新
+registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    console.log("New content available, please refresh.");
+  },
+  onOfflineReady() {
+    console.log("App ready to work offline.");
+  }
+});
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
