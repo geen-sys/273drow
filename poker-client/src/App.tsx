@@ -216,26 +216,25 @@ async function onAutoRun() {
   const canDrawNow = !!state && isDrawPhase && isYourTurn && discards.length <= 3;
 
   return (
-    <div className="min-h-screen w-full bg-neutral-950 text-neutral-100 flex flex-col items-center p-6 gap-6">
+    <div className="min-h-screen w-full bg-gradient-to-b from-[#0a0a0a] to-[#111] text-neutral-100 flex flex-col items-center p-6 gap-6">
       <div className="w-full max-w-6xl">
       <h1 className="game-title">
           2–7 Triple Draw
           <span className="game-sub"> prototype </span>
         </h1>
-        <p className="text-sm text-neutral-400">API: <span className="font-mono">{API_BASE || "(proxy)"}</span></p>
       </div>
 
       {/* Controls */}
       <div className="w-full max-w-6xl grid grid-cols-2 md:grid-cols-3 gap-2">
-        <button className="btn" onClick={onNewTable} disabled={loading}>New Table</button>
-        <button className="btn" onClick={onDeal} disabled={!tableId || loading}>Deal</button>
-        <button className="btn" onClick={onAutoRun} disabled={!tableId || loading || isYourTurn || isShowdown}>Auto Run (to p1)</button>
+      <button className="btn" onClick={onNewTable} disabled={loading}>新しいテーブル</button>
+      <button className="btn" onClick={onDeal} disabled={!tableId || loading}>配る</button>
+      <button className="btn" onClick={onAutoRun} disabled={!tableId || loading || isYourTurn || isShowdown}>自動進行（あなたの番まで）</button>
 
-        <button className="btn" onClick={() => act("check")} disabled={!canCheck || loading || isShowdown} title={!canCheck ? "自分の番のベットフェーズで、toCall=0の時だけ" : ""}>Check</button>
-        <button className="btn" onClick={() => act("call")} disabled={!canCall || loading || isShowdown} title={!canCall ? "自分の番のベットフェーズで、コール額がある時だけ" : ""}>Call {state?.toCall ? `(${state?.toCall})` : ""}</button>
-        <button className="btn" onClick={() => act("bet")} disabled={!canBet || loading || isShowdown} title={!canBet ? "自分の番のベットフェーズで、未ベット時のみ" : ""}>Bet</button>
-        <button className="btn" onClick={() => act("raise")} disabled={!canRaise || loading || isShowdown} title={!canRaise ? "自分の番のベットフェーズで、ベットがありcap未到達の時" : ""}>Raise</button>
-        <button className="btn !bg-red-600 hover:!bg-red-700" onClick={() => act("fold")} disabled={!canFold || loading || isShowdown} title="ベットフェーズ中のみ">Fold</button>
+      <button className="btn" onClick={() => act("check")} disabled={!canCheck || loading || isShowdown} title={!canCheck ? "自分の番のベットフェーズで、toCall=0の時だけ" : ""}>チェック</button>
+      <button className="btn" onClick={() => act("call")} disabled={!canCall || loading || isShowdown} title={!canCall ? "自分の番のベットフェーズで、コール額がある時だけ" : ""}>コール {state?.toCall ? `(${state?.toCall})` : ""}</button>
+      <button className="btn" onClick={() => act("bet")} disabled={!canBet || loading || isShowdown} title={!canBet ? "自分の番のベットフェーズで、未ベット時のみ" : ""}>ベット</button>
+      <button className="btn" onClick={() => act("raise")} disabled={!canRaise || loading || isShowdown} title={!canRaise ? "自分の番のベットフェーズで、ベットがありcap未到達の時" : ""}>レイズ</button>
+      <button className="btn !bg-red-600 hover:!bg-red-700" onClick={() => act("fold")} disabled={!canFold || loading || isShowdown} title="ベットフェーズ中のみ">フォールド</button>
 
         <button
           type="button"
@@ -244,12 +243,12 @@ async function onAutoRun() {
           disabled={!canDrawNow || loading}
           title={isDrawPhase ? (isYourTurn ? "選んだ枚数だけ引き直します" : "自分の番を待っています") : "ドローフェーズでのみ使用できます"}
         >
-          Draw ({discards.length})
+         ドロー({discards.length})
         </button>
 
-        <button className="btn" onClick={onShowdown} disabled={!tableId || loading}>Showdown</button>
-        <button className="btn" onClick={onNewHand} disabled={!tableId || loading}>New Hand</button>
-        <button className="btn" onClick={refreshDebug} disabled={!tableId || loading}>Refresh Debug</button>
+        <button className="btn" onClick={onShowdown} disabled={!tableId || loading}>ショウダウン</button>
+        <button className="btn" onClick={onNewHand} disabled={!tableId || loading}>新しいハンド</button>
+        <button className="btn" onClick={refreshDebug} disabled={!tableId || loading}>デバッグ更新</button>
       </div>
 
       {err && (
@@ -338,7 +337,7 @@ async function onAutoRun() {
           )}
 
           {/* Hero Hand + Discard toggles */}
-          <div className="mt-4">
+          <div className="mt-4 table-surface">
             <div className="text-sm text-neutral-400 mb-2">捨て札にするカードを最大 3 枚までクリック</div>
             {/* ★ 横並びにする行コンテナ（純CSS） */}
             <div className="card-row">
@@ -383,7 +382,7 @@ async function onAutoRun() {
               {["p2","p3","p4"].map((pid) => {
                 const cards = (revealedHands?.[pid] ?? []) as Card[];
                 return (
-                  <div key={pid} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
+                  <div key={pid} className="rounded-xl p-3 table-surface">
                     <div className="mb-2 flex items-center justify-between">
                       <div className="font-medium">{pid}</div>
                     </div>
