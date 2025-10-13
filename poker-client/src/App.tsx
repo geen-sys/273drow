@@ -61,7 +61,13 @@ export default function App() {
   // ---------- 便利参照 ----------
   const heroHand = state?.heroHand ?? [];
 
+  const [placements, setPlacements] = 
+  useState<Array<{ seatId: string; hand: Card[]; place: number }> | null>(null);
   const [revealedHands, setRevealedHands] = useState<Record<string, Card[]> | null>(null);
+
+  // ← JSXを return するより前の任意の場所で
+  const myPlace =
+  placements ? (placements.find(p => p.seatId === "p1")?.place ?? null) : null;
 
   // ---------- 共通POST（ボディなしはヘッダーを付けない：空JSONエラー回避） ----------
   async function callApi<T = any>(path: string, body?: unknown): Promise<T> {
@@ -98,6 +104,8 @@ async function onNewTable() {
     setState(null);
     setDebug(null);
     setRevealedHands(null);
+    setPlacements(null);
+    setResult?.(null); // result を使っている場合
   } catch {}
 }
 
@@ -130,6 +138,8 @@ async function onAutoRun() {
     setDiscards([]);
     setResult(null);       // ★ 前回の結果を消す
     setRevealedHands(null);
+    setPlacements(null);
+    setResult?.(null);
     await refreshDebug();
   }
 
@@ -174,6 +184,7 @@ async function onAutoRun() {
     setResult(r);
     // ★ 全員の手札
     if (r.hands) setRevealedHands(r.hands);
+    if (r.placements) setPlacements(r.placements); // [ {seatId, hand, place}, ... ]
     await refreshDebug();
   }
 
@@ -303,38 +314,11 @@ async function onAutoRun() {
               ) : (
                 // 相手の番の案内（※ショウダウン時はここに来ない）
                 <span className="text-neutral-300">
-                  相手の番です。<b>Auto Run</b> を押すと p1 の番まで進みます。
+                  相手の番です。<b>Auto Run</b> を押すと あなた の番まで進みます。
                 </span>
               )}
             </div>
           </div>
-
-
-          {/* === Result Panel === */}
-          {result && (
-            <div className="result-panel">
-              <div className="result-title">Showdown Result</div>
-              <div className="result-line"><b>Winners:</b> {result.winners.join(", ")}</div>
-              <div className="result-line"><b>Pot:</b> {result.pot}</div>
-              {result.best && (
-                <div className="result-line"><b>Best:</b> {Array.isArray(result.best) ? result.best.join(" ") : result.best}</div>
-              )}
-              {result.stacks && (
-                <div className="result-stacks">
-                  {Object.entries(result.stacks).map(([pid, chips]) => (
-                    <div key={pid} className="stack-item">
-                      <span className="mono">{pid}</span>
-                      <span className="mono">{chips}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="result-actions">
-                <button className="btn" onClick={() => setResult(null)}>Clear</button>
-                <button className="btn" onClick={onNewHand} disabled={!tableId}>New Hand</button>
-              </div>
-            </div>
-          )}
 
           {/* Hero Hand + Discard toggles */}
           <div className="mt-4 table-surface">
@@ -370,57 +354,60 @@ async function onAutoRun() {
                   );
                 })}
               </div>
-                        </div>
+            </div>
 
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span>Hero:</span>
+          <span className="font-mono">{state?.heroSeatId ?? ""}</span>
+          {myPlace != null && <RankBadge place={myPlace} />}
         </div>
 
         {/* === Opponents (showdown only) === */}
-        {revealedHands && (
+        {revealedHands && placements && (
           <div className="bg-neutral-900/60 rounded-2xl p-4 border border-neutral-800">
-            <div className="text-lg font-medium mb-3">ショウダウン結果（相手の手札）</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {["p2","p3","p4"].map((pid) => {
-                const cards = (revealedHands?.[pid] ?? []) as Card[];
-                return (
-                  <div key={pid} className="rounded-xl p-3 table-surface">
-                    <div className="mb-2 flex items-center justify-between">
-                      <div className="font-medium">{pid}</div>
+            <div className="text-lg font-medium mb-3">ショウダウン結果（相手）</div>
+
+            {(() => {
+              const allOppIds = ["p2", "p3", "p4"];
+              const placeMap = new Map(placements.map(p => [p.seatId, p.place]));
+              const rows = allOppIds.map(seatId => ({
+                seatId,
+                place: placeMap.get(seatId) ?? 4, // placements に無ければ4位扱い（フォールド）
+                cards: (revealedHands?.[seatId] ?? []) as Card[],
+              }));
+
+              rows.sort((a, b) => a.place - b.place); // 1→2→3→4
+
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {rows.map(({ seatId, place, cards }) => (
+                    <div key={seatId} className="rounded-xl p-3 table-surface">
+                      <div className="mb-2 flex items-center justify-between">
+                        {/* <div className="font-medium">{seatId}</div> */}
+                        <RankBadge place={place} />
+                      </div>
+
+                      {cards.length > 0 ? (
+                        <div className="big-hand-row">
+                          {cards.map((c, i) => <BigCard key={`${seatId}-${i}-${c}`} card={c} />)}
+                        </div>
+                      ) : (
+                        <div className="folded-panel">フォールド</div>
+                      )}
                     </div>
-                    {/* ★ 横並びで大きいカードを5枚 */}
-                    <div className="big-hand-row">
-                      {cards.map((c, i) => (
-                        <BigCard key={`${pid}-${i}-${c}`} card={c}/>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         )}
 
-        {/* Action history */}
-        <div className="bg-neutral-900/60 rounded-2xl p-4 border border-neutral-800">
-          <div className="text-lg font-medium mb-2">このラウンドのアクション履歴</div>
-          <div className="flex flex-col gap-1 text-sm max-h-48 overflow-auto">
-            {(state?.actionHistory ?? []).length === 0 && (
-              <div className="text-neutral-500">（まだアクションはありません）</div>
-            )}
-            {(state?.actionHistory ?? []).map((h, i) => (
-              <div key={i} className="font-mono">
-                {h.seatId}: {h.a}{h.size ? `(${h.size})` : ""}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Debug viewer */}
-        {debug && (
-          <div className="bg-neutral-900/60 rounded-2xl p-4 border border-neutral-800">
-            <div className="text-lg font-medium mb-2">Debug</div>
-            <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(debug, null, 2)}</pre>
-          </div>
+        {import.meta.env.DEV && debug && (
+          <pre className="text-xs text-neutral-400">{JSON.stringify(debug, null, 2)}</pre>
         )}
+
       </div>
 
       {/* Inline styles for buttons (Tailwind-like classes are used; this fallback helps if Tailwind isn't set) */}
@@ -487,5 +474,18 @@ function BigCard({ card }: { card: Card }) {
         {suitMap[s]}
       </text>
     </svg>
+  );
+}
+
+function RankBadge({ place }: { place: number }) {
+  const cls =
+    place === 1 ? "badge badge-win" :
+    place === 2 ? "badge badge-2"  :
+    place === 3 ? "badge badge-3"  :
+                  "badge badge-4";
+  return (
+    <span className={cls}>
+      {place === 1 ? "🏆 勝利" : `${place}位`}
+    </span>
   );
 }

@@ -21,6 +21,9 @@ importers:
       '@eslint/js':
         specifier: ^9.33.0
         version: 9.36.0
+      '@types/node':
+        specifier: ^24.7.2
+        version: 24.7.2
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.24
@@ -29,7 +32,7 @@ importers:
         version: 18.3.7(@types/react@18.3.24)
       '@vitejs/plugin-react':
         specifier: ^5.0.0
-        version: 5.0.4(vite@7.1.7(terser@5.44.0))
+        version: 5.0.4(vite@7.1.7(@types/node@24.7.2)(terser@5.44.0))
       eslint:
         specifier: ^9.33.0
         version: 9.36.0
@@ -50,10 +53,10 @@ importers:
         version: 8.44.1(eslint@9.36.0)(typescript@5.9.2)
       vite:
         specifier: ^7.1.2
-        version: 7.1.7(terser@5.44.0)
+        version: 7.1.7(@types/node@24.7.2)(terser@5.44.0)
       vite-plugin-pwa:
         specifier: ^1.0.3
-        version: 1.0.3(vite@7.1.7(terser@5.44.0))(workbox-build@7.3.0(@types/babel__core@7.20.5))(workbox-window@7.3.0)
+        version: 1.0.3(vite@7.1.7(@types/node@24.7.2)(terser@5.44.0))(workbox-build@7.3.0(@types/babel__core@7.20.5))(workbox-window@7.3.0)
 
 packages:
 
@@ -996,6 +999,9 @@ packages:
 
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
+
+  '@types/node@24.7.2':
+    resolution: {integrity: sha512-/NbVmcGTP+lj5oa4yiYxxeBjRivKQ5Ns1eSZeB99ExsEQ6rX5XYU1Zy/gGxY/ilqtD4Etx9mKyrPxZRetiahhA==}
 
   '@types/prop-types@15.7.15':
     resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
@@ -2149,6 +2155,9 @@ packages:
   unbox-primitive@1.1.0:
     resolution: {integrity: sha512-nWJ91DjeOkej/TA8pXQ3myruKpKEYgqvpw9lz4OPHj/NWFNluYrjbz9j01CJ8yKQd2g4jFoOkINCTW2I5LEEyw==}
     engines: {node: '>= 0.4'}
+
+  undici-types@7.14.0:
+    resolution: {integrity: sha512-QQiYxHuyZ9gQUIrmPo3IA+hUl4KYk8uSA7cHrcKd/l3p1OTpZcM0Tbp9x7FAtXdAYhlasd60ncPpgu6ihG6TOA==}
 
   unicode-canonical-property-names-ecmascript@2.0.1:
     resolution: {integrity: sha512-dA8WbNeb2a6oQzAQ55YlT5vQAWGV9WXOsi3SskE3bcCdM0P4SDd+24zS/OCacdRq5BkdsRj9q3Pg6YyQoxIGqg==}
@@ -3323,6 +3332,10 @@ snapshots:
 
   '@types/json-schema@7.0.15': {}
 
+  '@types/node@24.7.2':
+    dependencies:
+      undici-types: 7.14.0
+
   '@types/prop-types@15.7.15': {}
 
   '@types/react-dom@18.3.7(@types/react@18.3.24)':
@@ -3431,7 +3444,7 @@ snapshots:
       '@typescript-eslint/types': 8.44.1
       eslint-visitor-keys: 4.2.1
 
-  '@vitejs/plugin-react@5.0.4(vite@7.1.7(terser@5.44.0))':
+  '@vitejs/plugin-react@5.0.4(vite@7.1.7(@types/node@24.7.2)(terser@5.44.0))':
     dependencies:
       '@babel/core': 7.28.4
       '@babel/plugin-transform-react-jsx-self': 7.27.1(@babel/core@7.28.4)
@@ -3439,7 +3452,7 @@ snapshots:
       '@rolldown/pluginutils': 1.0.0-beta.38
       '@types/babel__core': 7.20.5
       react-refresh: 0.17.0
-      vite: 7.1.7(terser@5.44.0)
+      vite: 7.1.7(@types/node@24.7.2)(terser@5.44.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -4680,6 +4693,8 @@ snapshots:
       has-symbols: 1.1.0
       which-boxed-primitive: 1.1.1
 
+  undici-types@7.14.0: {}
+
   unicode-canonical-property-names-ecmascript@2.0.1: {}
 
   unicode-match-property-ecmascript@2.0.0:
@@ -4709,18 +4724,18 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
-  vite-plugin-pwa@1.0.3(vite@7.1.7(terser@5.44.0))(workbox-build@7.3.0(@types/babel__core@7.20.5))(workbox-window@7.3.0):
+  vite-plugin-pwa@1.0.3(vite@7.1.7(@types/node@24.7.2)(terser@5.44.0))(workbox-build@7.3.0(@types/babel__core@7.20.5))(workbox-window@7.3.0):
     dependencies:
       debug: 4.4.3
       pretty-bytes: 6.1.1
       tinyglobby: 0.2.15
-      vite: 7.1.7(terser@5.44.0)
+      vite: 7.1.7(@types/node@24.7.2)(terser@5.44.0)
       workbox-build: 7.3.0(@types/babel__core@7.20.5)
       workbox-window: 7.3.0
     transitivePeerDependencies:
       - supports-color
 
-  vite@7.1.7(terser@5.44.0):
+  vite@7.1.7(@types/node@24.7.2)(terser@5.44.0):
     dependencies:
       esbuild: 0.25.10
       fdir: 6.5.0(picomatch@4.0.3)
@@ -4729,6 +4744,7 @@ snapshots:
       rollup: 4.52.3
       tinyglobby: 0.2.15
     optionalDependencies:
+      '@types/node': 24.7.2
       fsevents: 2.3.3
       terser: 5.44.0
 

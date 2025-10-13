@@ -449,13 +449,39 @@ action(tableId: string, playerId: string, action: "check" | "call" | "bet" | "ra
     showdown(tableId: string) {
       const t = must(tableId);
       const alive = t.seats.filter(s => s.inHand);
-      if (alive.length === 0) return { winners: [], pot: t.round.pot, best: undefined };
+      if (alive.length === 0) {
+        return {
+          winners: [],
+          pot: t.round.pot,
+          best: undefined,
+          stacks: Object.fromEntries(t.seats.map(s => [s.id, s.stack])),
+          // 追加フィールドも空で返す
+          hands: {},
+          placements: []
+        };
+      }
     
+      // ★ cmp27 で昇順（＝強い順に先頭へ）
       const ranked = [...alive].sort((a, b) => cmp27(a.hand!, b.hand!));
       const best = ranked[0];
       const winners = ranked.filter(s => cmp27(s.hand!, best.hand!) === 0);
     
-      // ★ 均等配分（端数は先着順で1点ずつ）
+      // === 追加: 順位（同値は同順位）
+      // ranked を先頭（最強）から見て、直前と同値なら同じ順位、違えば i+1
+      const placements: { seatId: string; hand: Card[]; place: number }[] = [];
+      let place = 1;
+      for (let i = 0; i < ranked.length; i++) {
+        if (i > 0 && cmp27(ranked[i].hand!, ranked[i - 1].hand!) !== 0) {
+          place = i + 1;
+        }
+        placements.push({
+          seatId: ranked[i].id,
+          hand: ranked[i].hand as Card[],
+          place
+        });
+      }
+    
+      // === 均等配分（端数は先着順で1点ずつ）
       const pot = t.round.pot;
       const share = Math.floor(pot / winners.length);
       let rem = pot - share * winners.length;
@@ -464,7 +490,10 @@ action(tableId: string, playerId: string, action: "check" | "call" | "bet" | "ra
         if (rem > 0) rem--;
       }
     
-      // ★ 次ハンド準備（ボタン回す・状態初期化）
+      // 追加: 公開用の hands マップ（p1〜pN）
+      const hands = Object.fromEntries(alive.map(s => [s.id, s.hand as Card[]]));
+    
+      // ★ 次ハンド準備
       t.buttonIndex = (t.buttonIndex + 1) % t.seats.length;
       t.round.pot = 0;
       t.round.currentBet = 0;
@@ -472,7 +501,15 @@ action(tableId: string, playerId: string, action: "check" | "call" | "bet" | "ra
       t.mode = "bet";
       t.drawStart = undefined;
     
-      return { winners: winners.map(w => w.id), pot, best: best.hand, stacks: Object.fromEntries(t.seats.map(s => [s.id, s.stack])) };
+      return {
+        winners: winners.map(w => w.id),
+        pot,
+        best: best.hand,
+        stacks: Object.fromEntries(t.seats.map(s => [s.id, s.stack])),
+        // === 追加返却 ===
+        hands,        // { p1:[..5], p2:[..5], ... }  ※ショウダウン時の手札
+        placements    // [ {seatId, hand, place}, ... ] 同値は同順位
+      };
     }    
     ,
   
@@ -489,3 +526,4 @@ action(tableId: string, playerId: string, action: "check" | "call" | "bet" | "ra
   };
   
 
+  
