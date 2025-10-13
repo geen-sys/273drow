@@ -7,6 +7,7 @@ import { useState } from "react";
 //   vite.config.ts 例:
 //   server: { proxy: { "/d27": { target: "http://localhost:8787", changeOrigin: true } } }
 const API_BASE = "http://localhost:8787"; // or "" (proxy)
+const DEV = import.meta.env.DEV;
 
 type Card =
   | "Ah" | "Ad" | "Ac" | "As" | "Kh" | "Kd" | "Kc" | "Ks" | "Qh" | "Qd" | "Qc" | "Qs"
@@ -273,6 +274,7 @@ async function onAutoRun() {
       <div className="w-full max-w-6xl grid gap-4">
         <div className="bg-neutral-900/60 rounded-2xl p-4 border border-neutral-800">
           {/* 横並びのサマリー（モバイルは自動折返し） */}
+          {DEV && (
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
             <div className="stat"><span className="stat-k">テーブル</span><span className="stat-v font-mono">{tableId || "—"}</span></div>
             <div className="stat"><span className="stat-k">ストリート</span><span className="stat-v font-mono">{state?.street ?? "—"}</span></div>
@@ -281,6 +283,7 @@ async function onAutoRun() {
             <div className="stat"><span className="stat-k">席</span><span className="stat-v font-mono">{state?.heroSeatId ?? "p1"}</span></div>
             <div className="stat"><span className="stat-k">フェーズ</span><span className="stat-v font-mono">{debug?.mode ?? "—"}</span></div>
           </div>
+          )}
 
 
           {/* 状況ガイド（ショウダウン優先） */}
@@ -295,10 +298,18 @@ async function onAutoRun() {
 
             <div className="text-sm mt-2">
               {isShowdown ? (
-                // ★ ショウダウン最優先：相手ターンの文言は出さない
-                <span className="text-emerald-300">
-                  ショウダウンです。「Showdown」ボタンを押して結果を表示してください。
-                </span>
+                result ? (
+                  // ★ 結果が出た後のガイド
+                  <span className="text-emerald-300 font-semibold">
+                    このハンドは終了しました。<br />
+                    「配る」を押して次のゲームを始めましょう！
+                  </span>
+                ) : (
+                  // ★ まだショウダウンしていない（Showdownボタン待ち）
+                  <span className="text-emerald-300">
+                    ショウダウンです。「Showdown」ボタンを押して結果を表示してください。
+                  </span>
+                )
               ) : isYourTurn ? (
                 isDrawPhase ? (
                   <span className="text-emerald-300">
@@ -322,7 +333,12 @@ async function onAutoRun() {
 
           {/* Hero Hand + Discard toggles */}
           <div className="mt-4 table-surface">
-            <div className="text-sm text-neutral-400 mb-2">捨て札にするカードを最大 3 枚までクリック</div>
+            {/* ▼ ドロー時だけ白字で表示 */}
+            {isDrawPhase && (
+              <div className="text-sm text-white mb-2">
+                捨て札にするカードを最大 3 枚までクリック
+              </div>
+            )}
             {/* ★ 横並びにする行コンテナ（純CSS） */}
             <div className="card-row">
                 {heroHand.map((c) => {
@@ -359,8 +375,8 @@ async function onAutoRun() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span>Hero:</span>
-          <span className="font-mono">{state?.heroSeatId ?? ""}</span>
+          <span>あなた:</span>
+          {/* <span className="font-mono">{state?.heroSeatId ?? ""}</span> */}
           {myPlace != null && <RankBadge place={myPlace} />}
         </div>
 
@@ -404,7 +420,7 @@ async function onAutoRun() {
           </div>
         )}
 
-        {import.meta.env.DEV && debug && (
+        {DEV && debug && (
           <pre className="text-xs text-neutral-400">{JSON.stringify(debug, null, 2)}</pre>
         )}
 

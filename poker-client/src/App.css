@@ -249,3 +249,9 @@
 }
 .big-card.red { color: #e11d48; }
 .big-card.black { color: #111827; }
+
+.playing-card.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none; /* 完全にクリック無効 */
+}
