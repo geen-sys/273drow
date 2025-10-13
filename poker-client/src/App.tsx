@@ -6,7 +6,7 @@ import { useState } from "react";
 // ▼ サーバの場所（Viteの開発プロキシを使うなら "" にして相対パスで叩く）
 //   vite.config.ts 例:
 //   server: { proxy: { "/d27": { target: "http://localhost:8787", changeOrigin: true } } }
-const API_BASE = "http://localhost:8787"; // or "" (proxy)
+const API_BASE = ""; // or "" (proxy)
 const DEV = import.meta.env.DEV;
 
 type Card =
@@ -260,7 +260,7 @@ async function onAutoRun() {
 
         <button className="btn" onClick={onShowdown} disabled={!tableId || loading}>ショウダウン</button>
         <button className="btn" onClick={onNewHand} disabled={!tableId || loading}>新しいハンド</button>
-        <button className="btn" onClick={refreshDebug} disabled={!tableId || loading}>デバッグ更新</button>
+        {/* <button className="btn" onClick={refreshDebug} disabled={!tableId || loading}>デバッグ更新</button> */}
       </div>
 
       {err && (
@@ -272,9 +272,10 @@ async function onAutoRun() {
 
       {/* Table + Hand */}
       <div className="w-full max-w-6xl grid gap-4">
+
         <div className="bg-neutral-900/60 rounded-2xl p-4 border border-neutral-800">
           {/* 横並びのサマリー（モバイルは自動折返し） */}
-          {DEV && (
+          {/* {DEV && (
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
             <div className="stat"><span className="stat-k">テーブル</span><span className="stat-v font-mono">{tableId || "—"}</span></div>
             <div className="stat"><span className="stat-k">ストリート</span><span className="stat-v font-mono">{state?.street ?? "—"}</span></div>
@@ -283,7 +284,7 @@ async function onAutoRun() {
             <div className="stat"><span className="stat-k">席</span><span className="stat-v font-mono">{state?.heroSeatId ?? "p1"}</span></div>
             <div className="stat"><span className="stat-k">フェーズ</span><span className="stat-v font-mono">{debug?.mode ?? "—"}</span></div>
           </div>
-          )}
+          )} */}
 
 
           {/* 状況ガイド（ショウダウン優先） */}
@@ -293,7 +294,7 @@ async function onAutoRun() {
               <span className="mr-2">手番: <span className="font-mono">{debug?.currentSeat ?? "—"}</span></span>
               <span className="mr-2">レイズ数: <span className="font-mono">{debug?.raises ?? 0}/{debug?.cap ?? "?"}</span></span>
               <span className="mr-2">現在ベット: <span className="font-mono">{debug?.currentBet ?? 0}</span></span>
-              <span className="mr-2">ポット: <span className="font-mono">{state?.pot ?? 0}</span></span>
+              {/* <span className="mr-2">ポット: <span className="font-mono">{state?.pot ?? 0}</span></span> */}
             </div>
 
             <div className="text-sm mt-2">
@@ -325,7 +326,7 @@ async function onAutoRun() {
               ) : (
                 // 相手の番の案内（※ショウダウン時はここに来ない）
                 <span className="text-neutral-300">
-                  相手の番です。<b>Auto Run</b> を押すと あなた の番まで進みます。
+                  相手の番です。<b>自動進行</b> を押すと あなた の番まで進みます。
                 </span>
               )}
             </div>

@@ -42,7 +42,16 @@ export default defineConfig({
     })
   ],
   server: {
-    // 既に設定済みならそのまま。PWA自体とは独立です
-    proxy: { "/d27": { target: "http://localhost:8787", changeOrigin: true } }
-  }
+    host: true,              // ← LAN公開
+    port: 5173,
+    proxy: {
+      // /d27 はバックエンドへ転送（ViteがMac上で動くので targetはlocalhostでOK）
+      "/d27": {
+        target: "http://localhost:8787",
+        changeOrigin: true,
+        // 必要なら：ヘッダ調整
+        // configure: (proxy) => { proxy.on('proxyReq', ...); }
+      },
+    },
+  },
 });
