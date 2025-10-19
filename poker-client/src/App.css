@@ -275,3 +275,25 @@
 .drop-shadow {
   filter: drop-shadow(0 6px 18px rgba(0,0,0,0.25));
 }
+
+/* バッジ＋カード列を横並び */
+.showdown-line {
+  display: flex;
+  align-items: center;
+  justify-content: center; /* 全体も中央寄せ */
+  gap: 12px;
+}
+
+/* カード列を中央寄せに */
+.showdown-line .card-row {
+  display: flex;
+  justify-content: center;   /* ← ここを center に変更！ */
+  align-items: center;
+  gap: var(--card-gap, 12px);
+  flex-wrap: nowrap;
+}
+
+/* 順位バッジに少し余白（任意） */
+.showdown-line .rank-badge {
+  margin-right: 6px;
+}
