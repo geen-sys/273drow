@@ -74,47 +74,42 @@ export default function App() {
   const cardRowRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    function recalcCardSize() {
-      const row = cardRowRef.current;
-      if (!row) return;
-
-      // 実測幅
-      const W = row.clientWidth;
-
-      // 1行に並べたい枚数とギャップ
+    function recalcGlobalCardSize() {
+      // 画面の実効横幅
+      const vw = Math.min(window.innerWidth, document.documentElement.clientWidth);
+  
+      // コンテナ左右の余白（全体の見た目に合わせて調整）
+      const padding = 32;              // px
+      const available = vw - padding * 2;
+  
+      // 1行に並べたい枚数＆ギャップ
       const cardsPerRow = 5;
-      const gap = 12; // CSSの --card-gap と合わせる
+      const gap = 12;
       const totalGap = gap * (cardsPerRow - 1);
-
-      // 1枚あたりの最大幅（実測から逆算）
-      const maxWidthBySpace = Math.floor((W - totalGap) / cardsPerRow);
-
-      // 安全域（見た目の上下限）
-      const MIN = 80;   // これ以下は文字潰れやすい
-      const MAX = 120;  // これ以上は横に収まりにくい
-
-      // 幅の決定：スペースがMIN未満ならそのまま maxWidthBySpace を使う
-      const cardW = (maxWidthBySpace < MIN)
-        ? Math.max(60, maxWidthBySpace)                 // どうしても狭い端末では 60 まで許容して1行死守
-        : Math.min(MAX, maxWidthBySpace);              // 通常は MAX を上限に
-
-      const cardH = Math.round(cardW * 1.4);           // 1:1.4 の比率
-
-      // CSS 変数に反映
-      row.style.setProperty("--card-gap", `${gap}px`);
-      row.style.setProperty("--card-w", `${cardW}px`);
-      row.style.setProperty("--card-h", `${cardH}px`);
+  
+      // 1枚あたりの最大幅（“隙間込みで5枚ちょうど”になる幅）
+      const maxW = Math.floor((available - totalGap) / cardsPerRow);
+  
+      // 安全域（文字潰れや折り返し回避）
+      const MIN = 80;
+      const MAX = 110;
+  
+      const cardW = (maxW < MIN) ? Math.max(60, maxW) : Math.min(MAX, maxW);
+      const cardH = Math.round(cardW * 1.4); // 比率 1 : 1.4
+  
+      // :root へ反映（全 .big-card に効く）
+      const root = document.documentElement;
+      root.style.setProperty("--card-gap", `${gap}px`);
+      root.style.setProperty("--card-w", `${cardW}px`);
+      root.style.setProperty("--card-h", `${cardH}px`);
     }
-
-    // 初回とリサイズで再計算
-    recalcCardSize();
-    window.addEventListener("resize", recalcCardSize);
-    // iPhone のアドレスバー表示/非表示で高さが変わる対策（向き変化）
-    window.addEventListener("orientationchange", recalcCardSize);
-
+  
+    recalcGlobalCardSize();
+    window.addEventListener("resize", recalcGlobalCardSize);
+    window.addEventListener("orientationchange", recalcGlobalCardSize);
     return () => {
-      window.removeEventListener("resize", recalcCardSize);
-      window.removeEventListener("orientationchange", recalcCardSize);
+      window.removeEventListener("resize", recalcGlobalCardSize);
+      window.removeEventListener("orientationchange", recalcGlobalCardSize);
     };
   }, []);
 
@@ -448,16 +443,13 @@ async function onAutoRun() {
               return (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {rows.map(({ seatId, place, cards }) => (
-                    <div key={seatId} className="rounded-xl p-3 table-surface card-row"  ref={cardRowRef}>
-                      <div className="mb-2 flex items-center justify-between">
-                        {/* <div className="font-medium">{seatId}</div> */}
+                    <div key={seatId} className="rounded-xl p-3 table-surface">
+                      <div className="mb-2 flex items-center justify-end">
                         <RankBadge place={place} />
                       </div>
-
+              
                       {cards.length > 0 ? (
-                        <div className="big-hand-row">
-                          {cards.map((c, i) => <BigCard key={`${seatId}-${i}-${c}`} card={c} />)}
-                        </div>
+                        <OpponentHandRow cards={cards} />
                       ) : (
                         <div className="folded-panel">フォールド</div>
                       )}
@@ -513,34 +505,128 @@ async function onAutoRun() {
     const isRed = s === "h" || s === "d";
     return { rank: r, suit: s, suitChar: suitGlyph[s], isRed };
   }
+
+  // App.tsx 内（コンポーネント外でもOK）に追加
+  function OpponentCard({ card }: { card: Card }) {
+    const { rank, suitChar, isRed } = splitCard(card);
+    return (
+      <div className={`playing-card ${isRed ? "red" : "black"}`} title={card}>
+        {/* 左上 */}
+        <div className="corner tl">
+          <div className="rank">{rank}</div>
+          <div className="suit">{suitChar}</div>
+        </div>
+        {/* 右下 */}
+        <div className="corner br">
+          <div className="rank">{rank}</div>
+          <div className="suit">{suitChar}</div>
+        </div>
+        {/* 中央の大きいスート */}
+        <div className={`center ${isRed ? "red" : "black"}`}>{suitChar}</div>
+      </div>
+    );
+  }
+
+  function OpponentHandRow({ cards }: { cards: Card[] }) {
+    return (
+      <div className="card-row">
+        {cards.map((c, i) => (
+          <OpponentCard key={`${c}-${i}`} card={c} />
+        ))}
+      </div>
+    );
+  }
 }
 
 
-function BigCard({ card }: { card: Card }) {
-  const r = card[0]; // 'A','K','Q','J','T','9'...'2'
-  const s = card[1]; // 'h','d','c','s'
-  const suitMap: Record<string, string> = { h: "♥", d: "♦", c: "♣", s: "♠" };
-  const isRed = s === "h" || s === "d";
+// function BigCard({ card }: { card: Card }) {
+//   // 文字と配置を比率で決める（viewBox は 300x420 = 比率 1:1.4）
+//   const VB_W = 300;
+//   const VB_H = 420;
 
-  return (
-    <svg width="72" height="100" viewBox="0 0 72 100" className="big-card drop-shadow">
-      <rect x="0.75" y="0.75" width="70.5" height="98.5" rx="8" fill="#ffffff"/>
-      <rect x="0.75" y="0.75" width="70.5" height="98.5" rx="8" stroke="#d1d5db" fill="none"/>
-      {/* 左上 */}
-      <text x="6" y="18" fontSize="18" fontWeight="700" fill={isRed ? "#dc2626" : "#111827"}>{r}</text>
-      <text x="6" y="34" fontSize="18" fill={isRed ? "#dc2626" : "#111827"}>{suitMap[s]}</text>
-      {/* 右下（反転） */}
-      <g transform="translate(66,94) rotate(180)">
-        <text x="0" y="0" fontSize="18" fontWeight="700" textAnchor="end" fill={isRed ? "#dc2626" : "#111827"}>{r}</text>
-        <text x="0" y="16" fontSize="18" textAnchor="end" fill={isRed ? "#dc2626" : "#111827"}>{suitMap[s]}</text>
-      </g>
-      {/* 中央の大きいスート薄色 */}
-      <text x="36" y="56" textAnchor="middle" fontSize="36" opacity="0.15" fill={isRed ? "#ef4444" : "#111827"}>
-        {suitMap[s]}
-      </text>
-    </svg>
-  );
-}
+//   const r = card[0]; // 'A','K','Q','J','T','9'...'2'
+//   const s = card[1]; // 'h','d','c','s'
+//   const suitMap: Record<string, string> = { h: "♥", d: "♦", c: "♣", s: "♠" };
+//   const isRed = s === "h" || s === "d";
+//   const dark = "#111827";
+//   const red  = "#dc2626";
+
+//   // 余白・角丸・フォントサイズなどを高さの割合で
+//   const pad    = VB_H * 0.045;          // 外枠パディング ~4.5%
+//   const rad    = VB_H * 0.048;          // 角丸
+//   const rankFS = VB_H * 0.085;          // 左上/右下のランク文字
+//   const suitFS = VB_H * 0.075;          // 左上/右下のスート文字
+//   const cenFS  = VB_H * 0.22;           // 中央の大スート
+//   const suitDY = rankFS * 0.95;         // ランクの下に少し間隔
+
+//   const stroke = "#d1d5db";
+
+//   return (
+//     <svg
+//       viewBox={`0 0 ${VB_W} ${VB_H}`}
+//       className="big-card drop-shadow"
+//       preserveAspectRatio="xMidYMid meet"
+//     >
+//       {/* カード本体 */}
+//       <rect x="1" y="1" width={VB_W - 2} height={VB_H - 2} rx={rad} fill="#fff" />
+//       <rect x="1" y="1" width={VB_W - 2} height={VB_H - 2} rx={rad} fill="none" stroke={stroke} />
+
+//       {/* 左上（ランク＋スート） */}
+//       <text
+//         x={pad}
+//         y={pad + rankFS}
+//         fontSize={rankFS}
+//         fontWeight={700}
+//         fill={isRed ? red : dark}
+//       >
+//         {r}
+//       </text>
+//       <text
+//         x={pad}
+//         y={pad + rankFS + suitDY}
+//         fontSize={suitFS}
+//         fill={isRed ? red : dark}
+//       >
+//         {suitMap[s]}
+//       </text>
+
+//       {/* 右下（反転して同じ見た目） */}
+//       <g transform={`translate(${VB_W - pad}, ${VB_H - pad}) rotate(180)`}>
+//         <text
+//           x={0}
+//           y={rankFS}
+//           fontSize={rankFS}
+//           fontWeight={700}
+//           textAnchor="end"
+//           fill={isRed ? red : dark}
+//         >
+//           {r}
+//         </text>
+//         <text
+//           x={0}
+//           y={rankFS + suitDY}
+//           fontSize={suitFS}
+//           textAnchor="end"
+//           fill={isRed ? red : dark}
+//         >
+//           {suitMap[s]}
+//         </text>
+//       </g>
+
+//       {/* 中央の大スート（薄色） */}
+//       <text
+//         x={VB_W / 2}
+//         y={VB_H * 0.57}
+//         textAnchor="middle"
+//         fontSize={cenFS}
+//         opacity="0.14"
+//         fill={isRed ? "#ef4444" : dark}
+//       >
+//         {suitMap[s]}
+//       </text>
+//     </svg>
+//   );
+// }
 
 function RankBadge({ place }: { place: number }) {
   const cls =

@@ -200,7 +200,6 @@
   box-shadow: 2px 4px 8px rgba(0,0,0,0.45);
 }
 
-.big-hand-row { display:flex; flex-direction:row; align-items:center; gap:10px; flex-wrap:wrap; }
 .folded-panel {
   display:flex; align-items:center; justify-content:center;
   height:104px; /* BigCard と揃える */
@@ -224,11 +223,21 @@
 .badge-4   { background:#374151; color:#e5e7eb; border-color:#374151; }
 
 
-.big-hand-row { display:flex; flex-direction:row; align-items:center; gap:10px; flex-wrap:wrap; }
+/* 行の並び：中央寄せ＋等間隔（他プレイヤーもこれでOK） */
+.big-hand-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;        /* ← 追加：中央寄せ */
+  gap: var(--card-gap, 12px);     /* ← 固定 10px から変数へ */
+  flex-wrap: nowrap;              /* ← 1行キープ（狭い端末では JS で縮む） */
+}
 
+/* カード本体：固定値 → 変数化（:root で一括制御） */
 .big-card {
-  width: 72px;   /* ←大きさここで保証 */
-  height: 100px;
+  display: block;                 /* ← インライン隙間を除去 */
+  width: var(--card-w, 110px);    /* ← 72px を変数へ */
+  height: var(--card-h, 154px);   /* ← 100px を変数へ（比率1:1.4） */
   background: #fff;
   border: 1px solid #444;
   border-radius: 10px;
@@ -236,6 +245,7 @@
   box-shadow: 2px 4px 10px rgba(0,0,0,.45);
   overflow: hidden;
 }
+
 .big-card .corner {
   position: absolute;
   display: flex;
@@ -260,4 +270,8 @@
   opacity: 0.5;
   cursor: not-allowed;
   pointer-events: none; /* 完全にクリック無効 */
+}
+
+.drop-shadow {
+  filter: drop-shadow(0 6px 18px rgba(0,0,0,0.25));
 }
