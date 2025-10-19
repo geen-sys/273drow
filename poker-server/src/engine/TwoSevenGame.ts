@@ -532,6 +532,12 @@ import {
       };
     }    
     ,
+
+    /** 現在の手番を、次の inHand 座席へ進める（フォールド席等をスキップ） */
+    advanceToNextSeat(tableId: string) {
+      const t = must(tableId);
+      advanceTurn(t); // ← 内部関数をそのまま利用
+    },
   
     /** 内部用：テーブルの生データ参照（AutoRunnerが使用） */
     _peek(tableId: string) {

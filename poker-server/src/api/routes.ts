@@ -44,15 +44,15 @@ export function registerRoutes(app: FastifyInstance) {
     let guard = 0;
     let lastKey = "";
   
-    // 状態が進む限り繰り返し、p1 の手番/ショウダウンで抜ける
-    while (guard++ < 200) {
+    while (guard++ < 300) {
       const st = TwoSevenGame._peek(tableId);
       if (!st) break;
   
-      // 進捗キー（同一なら停滞）
+      // 進捗トラッカー（状態が全く変わらない ➜ 停滞と判断）
       const key =
         `${st.mode}|${st.round.street}|${st.current}|${st.round.raises}|${st.round.currentBet}|` +
-        Object.values(st.round.committed || {}).join(",");
+        Object.values(st.round.committed || {}).join(",") +
+        `|${st.round.pot}`;
   
       if (key === lastKey) break;
       lastKey = key;
@@ -60,22 +60,32 @@ export function registerRoutes(app: FastifyInstance) {
       // ショウダウンなら終了
       if (st.mode === "showdown") break;
   
-      // p1 の手番に到達 → ベットフェーズなら必要に応じて自動コール
-      const curSeat = st.seats[st.current];
-      if (curSeat?.id === "p1") {
-        if (st.mode === "bet") {
-          const need = st.round.currentBet - (st.round.committed?.["p1"] ?? 0);
-          if (need > 0) {
-            // コールが必要なら一括自動コール（あなたの実装の autoCall を使用）
-            TwoSevenGame.autoCall(tableId);
-            // ここでドローフェーズに遷移する実装なら、一旦抜けてフロントに返す
-          }
-        }
-        break; // p1 の手番に来たので終了（フロントで表示/操作）
+      const cur = st.seats[st.current];
+  
+      // 無効/フォールド座席はスキップ（advance系のあなたの関数に置き換えOK）
+      if (!cur || !cur.inHand) {
+        TwoSevenGame.advanceToNextSeat(tableId);
+        continue;
       }
   
-      // まだ p1 手番じゃない/相手が続く → ランナーで前に進める
+      // p1 の手番に到達
+      if (cur.id === "p1") {
+        if (st.mode === "bet") {
+          const need = Math.max(0, st.round.currentBet - (st.round.committed?.["p1"] ?? 0));
+          if (need > 0) {
+            // ★ コールが必要なら自動コールだけ先に打って、もう一周回す
+            TwoSevenGame.autoCall(tableId);
+            continue; // ここで止めないのがポイント
+          }
+          // need == 0 の場合：このまま次の while で everyone matched → draw へ遷移するまで回す
+        }
+        // p1 の操作が必要な場面に来たら抜ける（ベット0/チェック可 or draw で手札選び待ち）
+        break;
+      }
+  
+      // まだ相手の番ならオートプレイ
       runAutoUntilP1(tableId);
+      // ループ先頭に戻って進捗チェック
     }
   
     const ps = TwoSevenGame.getPublicState(tableId, "p1");
