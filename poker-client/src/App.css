@@ -297,3 +297,13 @@
 .showdown-line .rank-badge {
   margin-right: 6px;
 }
+
+.card-enter {
+  transform: translateY(-20px);
+  opacity: 0;
+  transition: all 0.3s ease-out;
+}
+.card-enter-active {
+  transform: translateY(0);
+  opacity: 1;
+}

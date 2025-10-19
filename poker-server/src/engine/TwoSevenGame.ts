@@ -33,7 +33,6 @@ import {
     updateAllowed(t); // ★ これが肝
   }
   
-
   function betSizeFor(t: DrawTableState): number {
     return (t.round.street === "pre" || t.round.street === "post1")
       ? t.config.smallBet
@@ -212,153 +211,174 @@ import {
       t.mode = "bet";
       return { publicState: pub(t, t.seats[0].id) }; // heroId はあなたの実装に合わせて
     }        
-      ,
+    ,
+
+    autoCall(tableId: string) {
+      const t = must(tableId);
+    
+      if (t.mode !== "bet") {
+        return { message: "not in bet phase" };
+      }
+    
+      // 全員がコール（＝全員生存）
+      for (const s of t.seats) {
+        if (s.inHand) {
+          t.round.committed[s.id] = t.round.currentBet;
+        }
+      }
+    
+      // 次の手番へ（自動進行の場合に、コールフェーズをスキップするために、betにして次へ）
+      t.mode = "bet"
+      advanceTurn(t);
+    
+      return { publicState: pub(t, t.seats[0].id) };
+    },
   
     /** ベットアクション（fold/check/call/bet/raise） */
-// src/engine/TwoSevenGame.ts の action() 全置換
-action(tableId: string, playerId: string, action: "check" | "call" | "bet" | "raise" | "fold") {
-  const t = must(tableId);
+    // src/engine/TwoSevenGame.ts の action() 全置換
+    action(tableId: string, playerId: string, action: "check" | "call" | "bet" | "raise" | "fold") {
+      const t = must(tableId);
 
-  if (t.mode !== "bet") {
-    throw new Error("not bet phase");
-  }
+      if (t.mode !== "bet") {
+        throw new Error("not bet phase");
+      }
 
-  const seat = t.seats[t.current];
-  if (!seat) throw new Error("seat not found");
-  if (seat.id !== playerId) throw new Error("not your turn");
-  if (!seat.inHand) throw new Error("folded");
+      const seat = t.seats[t.current];
+      if (!seat) throw new Error("seat not found");
+      if (seat.id !== playerId) throw new Error("not your turn");
+      if (!seat.inHand) throw new Error("folded");
 
-  // --- ベットサイズ（リミット） ---
-  const betSize = (t.round.street === "pre" || t.round.street === "post1")
-    ? t.config.smallBet
-    : t.config.bigBet;
+      // --- ベットサイズ（リミット） ---
+      const betSize = (t.round.street === "pre" || t.round.street === "post1")
+        ? t.config.smallBet
+        : t.config.bigBet;
 
-  const committed = t.round.committed;
-  if (committed[seat.id] == null) committed[seat.id] = 0;
+      const committed = t.round.committed;
+      if (committed[seat.id] == null) committed[seat.id] = 0;
 
-  const toCall = Math.max(0, t.round.currentBet - committed[seat.id]);
+      const toCall = Math.max(0, t.round.currentBet - committed[seat.id]);
 
-  // ユーティリティ：チップ移動（今回はスタック差分を厳密に運用していない想定。必要ならstackも減らす）
-  const pay = (who: string, amount: number) => {
-    committed[who] = (committed[who] ?? 0) + amount;
-    t.round.pot += amount;
-  };
+      // ユーティリティ：チップ移動（今回はスタック差分を厳密に運用していない想定。必要ならstackも減らす）
+      const pay = (who: string, amount: number) => {
+        committed[who] = (committed[who] ?? 0) + amount;
+        t.round.pot += amount;
+      };
 
-  // --- アクション適用 ---
-  switch (action) {
-    case "fold": {
-      seat.inHand = false;
+      // --- アクション適用 ---
+      switch (action) {
+        case "fold": {
+          seat.inHand = false;
 
-      // 残り1人なら即ショウダウン状態へ
+          // 残り1人なら即ショウダウン状態へ
+          const alive = t.seats.filter(s => s.inHand);
+          if (alive.length === 1) {
+            t.mode = "showdown";
+            return { publicState: pub(t, playerId) };
+          }
+
+          // 次の手番へ
+          advanceTurn(t);
+          return { publicState: pub(t, playerId) };
+        }
+
+        case "check": {
+          if (toCall > 0) throw new Error("cannot check when toCall > 0");
+
+          // そのまま手番回す
+          advanceTurn(t);
+          break;
+        }
+
+        case "call": {
+          if (toCall === 0) throw new Error("nothing to call");
+          pay(seat.id, toCall);
+          // 手番回す
+          advanceTurn(t);
+          break;
+        }
+
+        case "bet": {
+          // まだ誰もベットしていない時だけ許可
+          if (t.round.currentBet !== 0) throw new Error("cannot bet, bet already set (raise instead)");
+          // キャップ確認（ベットはレイズとして1回カウント）
+          if ((t.round.raises ?? 0) >= (t.config.cap ?? 4)) throw new Error("bet/raise cap reached");
+
+          // 自分がベット額を支払って currentBet を更新
+          t.round.currentBet = betSize;
+          const need = t.round.currentBet - committed[seat.id];
+          pay(seat.id, need);
+
+          t.round.raises = (t.round.raises ?? 0) + 1;
+
+          advanceTurn(t);
+          break;
+        }
+
+        case "raise": {
+          if (t.round.currentBet === 0) throw new Error("nothing to raise"); // まずはbetから
+          if ((t.round.raises ?? 0) >= (t.config.cap ?? 4)) throw new Error("bet/raise cap reached");
+
+          // レイズ＝ currentBet に betSize を上乗せ
+          t.round.currentBet += betSize;
+
+          // 自分のコミットを新しい currentBet まで引き上げ
+          const need = t.round.currentBet - committed[seat.id];
+          if (need <= 0) throw new Error("already matched"); // 理論上起きにくいが保険
+          pay(seat.id, need);
+
+          t.round.raises = (t.round.raises ?? 0) + 1;
+
+          advanceTurn(t);
+          break;
+        }
+      }
+
+      // --- ラウンド締め判定 ---
       const alive = t.seats.filter(s => s.inHand);
-      if (alive.length === 1) {
+      const onlyOneLeft = alive.length === 1;
+      if (onlyOneLeft) {
+        // 誰かがフォールドして残り1人なら即ショウダウン
         t.mode = "showdown";
         return { publicState: pub(t, playerId) };
       }
 
-      // 次の手番へ
-      advanceTurn(t);
+      const everyoneMatched = alive.every(s => {
+        const c = committed[s.id] ?? 0;
+        return c === t.round.currentBet;
+      });
+
+      if (everyoneMatched) {
+        // ベット・レイズの応酬が終わって全員が currentBet に到達
+
+        if (t.round.street === "post3") {
+          // ★ 最終ベットラウンドが締まった → ショウダウンへ
+          t.mode = "showdown";
+          return { publicState: pub(t, playerId) };
+        }
+
+        // ★ まだ最終ではない → 次はドローフェーズへ
+        t.mode = "draw";
+        t.drawStart = t.current;
+
+        // 各ドローごとに1回のみ引けるようリセット
+        for (const s of t.seats) {
+          if (s.inHand) s.drawsRemaining = 1;
+        }
+        return { publicState: pub(t, playerId) };
+      }
+
+      // …各アクション適用後
+      t.round.didAct = true;  // ★ 最低1人は何かした
+
+      // ラウンド締め判定（4で詳細）
+      maybeCloseBetRound(t);
+
+      // 最後に allowed を更新（サイズやcapが変わることは少ないが常に整合を保つ）
+      updateAllowed(t);
+
+      // まだ締まっていない → そのままベット継続
       return { publicState: pub(t, playerId) };
     }
-
-    case "check": {
-      if (toCall > 0) throw new Error("cannot check when toCall > 0");
-
-      // そのまま手番回す
-      advanceTurn(t);
-      break;
-    }
-
-    case "call": {
-      if (toCall === 0) throw new Error("nothing to call");
-      pay(seat.id, toCall);
-      // 手番回す
-      advanceTurn(t);
-      break;
-    }
-
-    case "bet": {
-      // まだ誰もベットしていない時だけ許可
-      if (t.round.currentBet !== 0) throw new Error("cannot bet, bet already set (raise instead)");
-      // キャップ確認（ベットはレイズとして1回カウント）
-      if ((t.round.raises ?? 0) >= (t.config.cap ?? 4)) throw new Error("bet/raise cap reached");
-
-      // 自分がベット額を支払って currentBet を更新
-      t.round.currentBet = betSize;
-      const need = t.round.currentBet - committed[seat.id];
-      pay(seat.id, need);
-
-      t.round.raises = (t.round.raises ?? 0) + 1;
-
-      advanceTurn(t);
-      break;
-    }
-
-    case "raise": {
-      if (t.round.currentBet === 0) throw new Error("nothing to raise"); // まずはbetから
-      if ((t.round.raises ?? 0) >= (t.config.cap ?? 4)) throw new Error("bet/raise cap reached");
-
-      // レイズ＝ currentBet に betSize を上乗せ
-      t.round.currentBet += betSize;
-
-      // 自分のコミットを新しい currentBet まで引き上げ
-      const need = t.round.currentBet - committed[seat.id];
-      if (need <= 0) throw new Error("already matched"); // 理論上起きにくいが保険
-      pay(seat.id, need);
-
-      t.round.raises = (t.round.raises ?? 0) + 1;
-
-      advanceTurn(t);
-      break;
-    }
-  }
-
-  // --- ラウンド締め判定 ---
-  const alive = t.seats.filter(s => s.inHand);
-  const onlyOneLeft = alive.length === 1;
-  if (onlyOneLeft) {
-    // 誰かがフォールドして残り1人なら即ショウダウン
-    t.mode = "showdown";
-    return { publicState: pub(t, playerId) };
-  }
-
-  const everyoneMatched = alive.every(s => {
-    const c = committed[s.id] ?? 0;
-    return c === t.round.currentBet;
-  });
-
-  if (everyoneMatched) {
-    // ベット・レイズの応酬が終わって全員が currentBet に到達
-
-    if (t.round.street === "post3") {
-      // ★ 最終ベットラウンドが締まった → ショウダウンへ
-      t.mode = "showdown";
-      return { publicState: pub(t, playerId) };
-    }
-
-    // ★ まだ最終ではない → 次はドローフェーズへ
-    t.mode = "draw";
-    t.drawStart = t.current;
-
-    // 各ドローごとに1回のみ引けるようリセット
-    for (const s of t.seats) {
-      if (s.inHand) s.drawsRemaining = 1;
-    }
-    return { publicState: pub(t, playerId) };
-  }
-
-  // …各アクション適用後
-  t.round.didAct = true;  // ★ 最低1人は何かした
-
-  // ラウンド締め判定（4で詳細）
-  maybeCloseBetRound(t);
-
-  // 最後に allowed を更新（サイズやcapが変わることは少ないが常に整合を保つ）
-  updateAllowed(t);
-
-  // まだ締まっていない → そのままベット継続
-  return { publicState: pub(t, playerId) };
-}
 
     ,
   

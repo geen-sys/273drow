@@ -19,7 +19,8 @@ export function runAutoUntilP1(tableId: string) {
 
     const cur = st.seats[st.current];
     if (!cur || !cur.inHand) {
-      // 無効席なら（fold等）ターンはサーバ側の action/draw 内で進む想定。ここでは何もしないで次ループ。
+      // 次の席へ（あなたのテーブル設計に合わせて advance を呼ぶ、または current++ のメソッドを使う）
+      //try { TwoSevenGame._advanceTurn(st); } catch {}
       continue;
     }
 

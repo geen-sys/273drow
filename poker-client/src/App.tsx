@@ -74,6 +74,7 @@ export default function App() {
   const cardRowRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    autoCallIfNeeded();
     function recalcGlobalCardSize() {
       // 画面の実効横幅
       const vw = Math.min(window.innerWidth, document.documentElement.clientWidth);
@@ -242,7 +243,27 @@ async function onAutoRun() {
     }
   }
 
+  // === 自動コール処理 ===
+  async function autoCallIfNeeded() {
+    if (!tableId || !state) return;
   
+    // 現在のフェーズがベットフェーズ（"bet"）なら、自動コールAPIを呼ぶ
+    if (debug?.mode === "bet") {
+      try {
+        const res = await fetch("/d27/auto-call", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tableId }),
+        });
+        const newState = await res.json();
+        setState(newState);
+        await refreshDebug();
+      } catch (e) {
+        console.error("Auto call failed:", e);
+      }
+    }
+  }
+
   // ---------- 選択/表示ヘルパ ----------
   function toggleDiscard(card: Card) {
     setDiscards(prev => {
@@ -285,11 +306,11 @@ async function onAutoRun() {
       <button className="btn" onClick={onDeal} disabled={!tableId || loading}>配る</button>
       <button className="btn" onClick={onAutoRun} disabled={!tableId || loading || isYourTurn || isShowdown}>自動進行（あなたの番まで）</button>
 
-      <button className="btn" onClick={() => act("check")} disabled={!canCheck || loading || isShowdown} title={!canCheck ? "自分の番のベットフェーズで、toCall=0の時だけ" : ""}>チェック</button>
+      {/* <button className="btn" onClick={() => act("check")} disabled={!canCheck || loading || isShowdown} title={!canCheck ? "自分の番のベットフェーズで、toCall=0の時だけ" : ""}>チェック</button>
       <button className="btn" onClick={() => act("call")} disabled={!canCall || loading || isShowdown} title={!canCall ? "自分の番のベットフェーズで、コール額がある時だけ" : ""}>コール {state?.toCall ? `(${state?.toCall})` : ""}</button>
       <button className="btn" onClick={() => act("bet")} disabled={!canBet || loading || isShowdown} title={!canBet ? "自分の番のベットフェーズで、未ベット時のみ" : ""}>ベット</button>
       <button className="btn" onClick={() => act("raise")} disabled={!canRaise || loading || isShowdown} title={!canRaise ? "自分の番のベットフェーズで、ベットがありcap未到達の時" : ""}>レイズ</button>
-      <button className="btn !bg-red-600 hover:!bg-red-700" onClick={() => act("fold")} disabled={!canFold || loading || isShowdown} title="ベットフェーズ中のみ">フォールド</button>
+      <button className="btn !bg-red-600 hover:!bg-red-700" onClick={() => act("fold")} disabled={!canFold || loading || isShowdown} title="ベットフェーズ中のみ">フォールド</button> */}
 
         <button
           type="button"
@@ -332,13 +353,13 @@ async function onAutoRun() {
 
           {/* 状況ガイド（ショウダウン優先） */}
           <div className="mt-3 p-3 rounded-xl border border-neutral-800 bg-neutral-900/60">
-            <div className="text-sm">
+             {/* <div className="text-sm">
               <span className="mr-2">フェーズ: <span className="font-mono">{debug?.mode ?? "—"}</span></span>
               <span className="mr-2">手番: <span className="font-mono">{debug?.currentSeat ?? "—"}</span></span>
               <span className="mr-2">レイズ数: <span className="font-mono">{debug?.raises ?? 0}/{debug?.cap ?? "?"}</span></span>
               <span className="mr-2">現在ベット: <span className="font-mono">{debug?.currentBet ?? 0}</span></span>
-              {/* <span className="mr-2">ポット: <span className="font-mono">{state?.pot ?? 0}</span></span> */}
-            </div>
+              <span className="mr-2">ポット: <span className="font-mono">{state?.pot ?? 0}</span></span>
+            </div>  */}
 
             <div className="text-sm mt-2">
               {isShowdown ? (

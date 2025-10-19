@@ -6,6 +6,7 @@ import { z, ZodType } from "zod";
 import { TwoSevenGame } from "../engine/TwoSevenGame.js";
 import { runAutoUntilP1 } from "../engine/AutoRunner27.js";
 
+
 // "As", "Td", "7c" など1枚のカードを表すZodスキーマ
 const CardSchema: ZodType<Card> = z.custom<Card>(
   (val) => typeof val === "string" && /^[2-9TJQKA][hdcs]$/.test(val),
@@ -37,17 +38,48 @@ export function registerRoutes(app: FastifyInstance) {
     }
   });
   
-  app.post("/d27/auto/run", async (req, rep) => {
-    try {
-      const body = z.object({ tableId: z.string() }).parse(req.body);
-      runAutoUntilP1(body.tableId);
-      const ps = TwoSevenGame.getPublicState(body.tableId, "p1");
-      return rep.send(ps);
-    } catch (e: any) {
-      const msg = e?.message || "auto run failed";
-      const status = /table|not found|parse/i.test(msg) ? 400 : 500;
-      return rep.status(status).send({ message: msg });
+  app.post("/d27/auto/run", async (req, reply) => {
+    const { tableId } = req.body as { tableId: string };
+  
+    let guard = 0;
+    let lastKey = "";
+  
+    // 状態が進む限り繰り返し、p1 の手番/ショウダウンで抜ける
+    while (guard++ < 200) {
+      const st = TwoSevenGame._peek(tableId);
+      if (!st) break;
+  
+      // 進捗キー（同一なら停滞）
+      const key =
+        `${st.mode}|${st.round.street}|${st.current}|${st.round.raises}|${st.round.currentBet}|` +
+        Object.values(st.round.committed || {}).join(",");
+  
+      if (key === lastKey) break;
+      lastKey = key;
+  
+      // ショウダウンなら終了
+      if (st.mode === "showdown") break;
+  
+      // p1 の手番に到達 → ベットフェーズなら必要に応じて自動コール
+      const curSeat = st.seats[st.current];
+      if (curSeat?.id === "p1") {
+        if (st.mode === "bet") {
+          const need = st.round.currentBet - (st.round.committed?.["p1"] ?? 0);
+          if (need > 0) {
+            // コールが必要なら一括自動コール（あなたの実装の autoCall を使用）
+            TwoSevenGame.autoCall(tableId);
+            // ここでドローフェーズに遷移する実装なら、一旦抜けてフロントに返す
+          }
+        }
+        break; // p1 の手番に来たので終了（フロントで表示/操作）
+      }
+  
+      // まだ p1 手番じゃない/相手が続く → ランナーで前に進める
+      runAutoUntilP1(tableId);
     }
+  
+    const ps = TwoSevenGame.getPublicState(tableId, "p1");
+    reply.send(ps);
   });
   
   app.post("/d27/debug/round", async (req, rep) => {
@@ -98,7 +130,6 @@ export function registerRoutes(app: FastifyInstance) {
       return rep.status(status).send({ message: msg });
     }
   });
-  
   
   // 任意のタイミングでショーダウン（結果を返す）
   app.post("/d27/showdown", async (req, reply) => {
