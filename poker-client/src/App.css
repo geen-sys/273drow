@@ -62,12 +62,13 @@
   color: #888;
 }
 
-/* 横並び＆折り返し */
+/* 中央寄せの行レイアウト（横並び＋折返し） */
 .card-row {
   display: flex;
+  justify-content: center;     /* ← 中央寄せ */
+  align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
-  align-items: flex-start;
+  gap: var(--card-gap, 12px);  /* JS で上書き */
 }
 
 /* 1枚のカードの“紙っぽさ” */
@@ -93,6 +94,11 @@
   outline: 4px solid #3b82f6;        /* 青いハイライト */
   outline-offset: 0;
   box-shadow: 0 6px 16px rgba(59,130,246,0.25);
+}
+.playing-card.center { 
+  position: absolute; inset: 0; 
+  display: grid; place-items: center; 
+  font-size: 42px; opacity: .08; 
 }
 
 /* 左上／右下の角表示（ランク＋スート） */

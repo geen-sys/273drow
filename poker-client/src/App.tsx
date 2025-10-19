@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // ===== Deuce-to-Seven Triple Draw — Minimal Client (App.tsx) =====
 // サーバAPI: /d27/table/new, /d27/hand/deal, /d27/auto/run, /d27/hand/action, /d27/hand/draw, /d27/showdown, /d27/hand/new, /d27/debug/round
@@ -69,6 +69,54 @@ export default function App() {
   // ← JSXを return するより前の任意の場所で
   const myPlace =
   placements ? (placements.find(p => p.seatId === "p1")?.place ?? null) : null;
+
+  // ★ カード行の幅を取得する ref
+  const cardRowRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function recalcCardSize() {
+      const row = cardRowRef.current;
+      if (!row) return;
+
+      // 実測幅
+      const W = row.clientWidth;
+
+      // 1行に並べたい枚数とギャップ
+      const cardsPerRow = 5;
+      const gap = 12; // CSSの --card-gap と合わせる
+      const totalGap = gap * (cardsPerRow - 1);
+
+      // 1枚あたりの最大幅（実測から逆算）
+      const maxWidthBySpace = Math.floor((W - totalGap) / cardsPerRow);
+
+      // 安全域（見た目の上下限）
+      const MIN = 80;   // これ以下は文字潰れやすい
+      const MAX = 120;  // これ以上は横に収まりにくい
+
+      // 幅の決定：スペースがMIN未満ならそのまま maxWidthBySpace を使う
+      const cardW = (maxWidthBySpace < MIN)
+        ? Math.max(60, maxWidthBySpace)                 // どうしても狭い端末では 60 まで許容して1行死守
+        : Math.min(MAX, maxWidthBySpace);              // 通常は MAX を上限に
+
+      const cardH = Math.round(cardW * 1.4);           // 1:1.4 の比率
+
+      // CSS 変数に反映
+      row.style.setProperty("--card-gap", `${gap}px`);
+      row.style.setProperty("--card-w", `${cardW}px`);
+      row.style.setProperty("--card-h", `${cardH}px`);
+    }
+
+    // 初回とリサイズで再計算
+    recalcCardSize();
+    window.addEventListener("resize", recalcCardSize);
+    // iPhone のアドレスバー表示/非表示で高さが変わる対策（向き変化）
+    window.addEventListener("orientationchange", recalcCardSize);
+
+    return () => {
+      window.removeEventListener("resize", recalcCardSize);
+      window.removeEventListener("orientationchange", recalcCardSize);
+    };
+  }, []);
 
   // ---------- 共通POST（ボディなしはヘッダーを付けない：空JSONエラー回避） ----------
   async function callApi<T = any>(path: string, body?: unknown): Promise<T> {
@@ -341,7 +389,7 @@ async function onAutoRun() {
               </div>
             )}
             {/* ★ 横並びにする行コンテナ（純CSS） */}
-            <div className="card-row">
+            <div className="card-row" ref={cardRowRef}>
                 {heroHand.map((c) => {
                   const on = discards.includes(c);
                   const { rank, suitChar, isRed } = splitCard(c);
@@ -370,8 +418,8 @@ async function onAutoRun() {
                     </div>
                   );
                 })}
-              </div>
             </div>
+          </div>
 
         </div>
 
@@ -400,7 +448,7 @@ async function onAutoRun() {
               return (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {rows.map(({ seatId, place, cards }) => (
-                    <div key={seatId} className="rounded-xl p-3 table-surface">
+                    <div key={seatId} className="rounded-xl p-3 table-surface card-row"  ref={cardRowRef}>
                       <div className="mb-2 flex items-center justify-between">
                         {/* <div className="font-medium">{seatId}</div> */}
                         <RankBadge place={place} />
