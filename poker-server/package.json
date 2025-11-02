@@ -6,6 +6,7 @@
     "dev": "tsx watch src/index.ts",
     "start": "node --enable-source-maps dist/index.js",
     "build": "tsc -p .",
+    "zip": "zip -j lambda.zip dist/src/index.js",
     "test": "vitest run"
   },
   "dependencies": {
@@ -16,6 +17,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.4.0",
+    "@types/aws-lambda": "^8.10.131",
     "tsx": "^4.16.2",
     "typescript": "^5.5.4",
     "vitest": "^2.0.5"
