@@ -6,7 +6,8 @@ import { useEffect, useRef, useState } from "react";
 // ▼ サーバの場所（Viteの開発プロキシを使うなら "" にして相対パスで叩く）
 //   vite.config.ts 例:
 //   server: { proxy: { "/d27": { target: "http://localhost:8787", changeOrigin: true } } }
-const API_BASE = ""; // or "" (proxy)
+const API_BASE = (import.meta.env.VITE_API_BASE ?? "").trim();
+//const API_BASE = ""; // or "" (proxy)
 const DEV = import.meta.env.DEV;
 
 type Card =
