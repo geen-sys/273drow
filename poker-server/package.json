@@ -6,7 +6,7 @@
     "dev": "tsx watch src/index.ts",
     "start": "node --enable-source-maps dist/index.js",
     "build": "tsc -p .",
-    "test": "vitest run"
+    "test": "tsc -p . && node --test dist/test/**/*.js"
   },
   "dependencies": {
     "@fastify/cors": "^8.5.0",
