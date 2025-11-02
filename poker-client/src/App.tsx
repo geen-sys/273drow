@@ -189,28 +189,6 @@ async function onAutoRun() {
     await refreshDebug();
   }
 
-  async function act(kind: "bet" | "check" | "call" | "raise" | "fold") {
-    if (!state) return;
-    try {
-      // 行動 → PublicState が返る前提
-      const ps = await callApi<PublicState>("/d27/hand/action", {
-        tableId: state.tableId,
-        playerId: state.heroSeatId, // "p1"
-        action: kind,
-      });
-      setState(ps);                 // ★ ここで即反映
-  
-      // デバッグ情報も取り直す
-      await refreshDebug();
-  
-      // （任意）相手番を一気に進めたい場合
-      await callApi("/d27/auto/run", { tableId: state.tableId });
-      await refreshDebug();
-    } catch {}
-  }
-  
-  
-
   async function onDraw() {
     if (!tableId) return;
     const st = await callApi<PublicState>("/d27/hand/draw", {
@@ -285,11 +263,6 @@ async function onAutoRun() {
   const isYourTurn  = debug?.currentSeat === "p1";
   const isShowdown = debug?.mode === "showdown";
 
-  const canCheck   = !!state && isBetPhase && isYourTurn && (state.toCall ?? 0) === 0;
-  const canCall    = !!state && isBetPhase && isYourTurn && (state.toCall ?? 0) > 0;
-  const canBet     = !!state && isBetPhase && isYourTurn && (state.toCall ?? 0) === 0;
-  const canRaise   = !!state && isBetPhase && isYourTurn && (state.toCall ?? 0) > 0 && (debug?.raises ?? 0) < (debug?.cap ?? 0);
-  const canFold    = !!state && isBetPhase && isYourTurn;
   const canDrawNow = !!state && isDrawPhase && isYourTurn && discards.length <= 3;
 
   return (
