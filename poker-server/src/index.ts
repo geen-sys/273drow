@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import { registerRoutes } from "./api/routes.js";
 import * as dotenv from "dotenv";
+import type { IncomingHttpHeaders, OutgoingHttpHeaders } from "http";
 
 dotenv.config();
 
@@ -86,16 +87,44 @@ type LambdaResult = {
   cookies?: string[];
 };
 
-const isHttpApiEvent = (event: LambdaEvent): event is ApiGatewayV2Event =>
-  (event as ApiGatewayV2Event).version === "2.0" &&
-  !!(event as ApiGatewayV2Event).requestContext?.http;
+const SUPPORTED_HTTP_METHODS = [
+  "DELETE",
+  "GET",
+  "HEAD",
+  "PATCH",
+  "POST",
+  "PUT",
+  "OPTIONS",
+] as const;
 
-const getMethod = (event: LambdaEvent): string => {
-  if (isHttpApiEvent(event)) {
-    return event.requestContext.http.method ?? "GET";
+type SupportedHttpMethod = (typeof SUPPORTED_HTTP_METHODS)[number];
+
+const isSupportedHttpMethod = (value: string): value is SupportedHttpMethod =>
+  (SUPPORTED_HTTP_METHODS as readonly string[]).includes(value);
+
+const isHttpApiEvent = (event: LambdaEvent): event is ApiGatewayV2Event =>
+  event.version === "2.0";
+
+const toHttpMethod = (
+  value: string | null | undefined,
+): SupportedHttpMethod | undefined => {
+  if (!value) {
+    return undefined;
   }
 
-  return event.httpMethod ?? "GET";
+  const upper = value.toUpperCase();
+
+  return isSupportedHttpMethod(upper) ? upper : undefined;
+};
+
+const getMethod = (event: LambdaEvent): SupportedHttpMethod => {
+  const fallback: SupportedHttpMethod = "GET";
+
+  if (!isHttpApiEvent(event)) {
+    return toHttpMethod(event.httpMethod) ?? fallback;
+  }
+
+  return toHttpMethod(event.requestContext?.http?.method) ?? fallback;
 };
 
 const getPath = (event: LambdaEvent): string => {
@@ -148,7 +177,7 @@ const getPayload = (event: LambdaEvent): Buffer | string | undefined => {
 };
 
 const normalizeHeaders = (
-  headers: Record<string, string | string[] | undefined>,
+  headers: IncomingHttpHeaders | OutgoingHttpHeaders,
 ): {
   single: Record<string, string>;
   multi: Record<string, string[]>;
@@ -163,10 +192,10 @@ const normalizeHeaders = (
 
     if (Array.isArray(value)) {
       if (value.length > 0) {
-        multi[key] = value;
+        multi[key] = value.map(String);
       }
     } else {
-      single[key] = value;
+      single[key] = String(value);
     }
   }
 
