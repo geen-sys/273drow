@@ -15,7 +15,7 @@ const CardSchema: ZodType<Card> = z.custom<Card>(
 
 export function registerRoutes(app: FastifyInstance) {
   // ヘルスチェック
-  app.get("/health", async () => ({ ok: true }));
+  app.get("/d27/health", async () => ({ ok: true }));
 
   // ===== 2–7 Triple Draw エンドポイント =====
 
