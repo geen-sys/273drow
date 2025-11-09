@@ -1,12 +1,12 @@
 {
   "name": "poker-server",
   "private": true,
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "start": "node --enable-source-maps dist/index.js",
+    "start": "node --enable-source-maps dist/src/index.js",
     "build": "tsc -p .",
-    "zip": "zip -j lambda.zip dist/src/index.js",
+    "zip": "zip -j lambda.zip dist/lambda.js",
     "test": "vitest run"
   },
   "dependencies": {
@@ -16,8 +16,9 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/aws-lambda": "^8.10.157",
     "@types/node": "^24.4.0",
-    "@types/aws-lambda": "^8.10.131",
+    "esbuild": "^0.25.12",
     "tsx": "^4.16.2",
     "typescript": "^5.5.4",
     "vitest": "^2.0.5"

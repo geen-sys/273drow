@@ -1,13 +1,13 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ES2022",
-    "moduleResolution": "Bundler",
+    "target": "ES2020",
+    "module": "CommonJS",           // ← ESMではなくCJSに
+    "moduleResolution": "Node",     // ← bundlerではなくNodeに
     "outDir": "dist",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["node"]   // ← これを追加
+    "types": ["node", "aws-lambda"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }

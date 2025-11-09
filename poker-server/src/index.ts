@@ -43,12 +43,11 @@ export const buildApp = async (): Promise<FastifyInstance> => {
 };
 
 if (!process.env.AWS_LAMBDA_FUNCTION_NAME) {
-  const app = await buildApp();
-  const port = Number(process.env.PORT ?? 8787);
-
-  app.listen({ host: "0.0.0.0", port }).then(() => {
+  buildApp().then(async (app) => {
+    const port = Number(process.env.PORT ?? 8787);
+    await app.listen({ host: "0.0.0.0", port });
     console.log(`Server listening at http://0.0.0.0:${port}`);
-  });
+  }).catch((e) => { console.error(e); process.exit(1); });
 }
 
 type ApiGatewayV1Event = {
